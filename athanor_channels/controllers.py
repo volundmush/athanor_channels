@@ -1,17 +1,10 @@
 from django.conf import settings
-from django.db.models import Q
 
 from evennia.utils.utils import class_from_module
-from evennia.utils.logger import log_trace
 
 from athanor.gamedb.scripts import AthanorGlobalScript
-from athanor_channels.channels import AthanorAccountChannel, AthanorObjectChannel, AthanorChannelSystem, \
-    AthanorChannelCategory
-from athanor.utils.valid import simple_name
-from athanor.utils.text import partial_match
-from athanor_channels.models import ChannelCategoryBridge, ChannelBridge, AccountChannelSubscription, \
-    ObjectChannelSubscription, ChannelSystemBridge
-from athanor_channels import messages as cmsg
+from athanor_channels.models import ChannelSystemBridge
+from athanor_channels.gamedb import AbstractChannelSystem
 
 
 class AthanorChannelController(AthanorGlobalScript):
@@ -27,46 +20,33 @@ class AthanorChannelController(AthanorGlobalScript):
         """
         This loads the fallbacks for when more specific settings are not defined in settings.py.
         """
-        try:
-            chan_system_typeclass = settings.CHANNEL_SYSTEM_TYPECLASS
-            self.ndb.chan_system_typeclass = class_from_module(chan_system_typeclass,
-                                                                 defaultpaths=settings.TYPECLASS_PATHS)
-        except Exception:
-            log_trace()
-            self.ndb.chan_system_typeclass = AthanorChannelSystem
 
-        try:
-            chan_category_typeclass = settings.CHANNEL_CATEGORY_TYPECLASS
-            self.ndb.chan_category_typeclass = class_from_module(chan_category_typeclass,
-                                                                 defaultpaths=settings.TYPECLASS_PATHS)
-        except Exception:
-            log_trace()
-            self.ndb.chan_category_typeclass = AthanorChannelCategory
+        for sys_key, sys_data in settings.CHANNEL_SYSTEMS.items():
+            sys_typeclass = sys_data.get("system_typeclass", settings.CHANNEL_SYSTEM_TYPECLASS)
+            cat_typeclass = sys_data.get("category_typeclass", settings.CHANNEL_CATEGORY_TYPECLASS)
+            chan_typeclass = sys_data.get("channel_typeclass", settings.CHANNEL_CHANNEL_TYPECLASS)
+            command_class = sys_data.get("command_class", settings.CHANNEL_COMMAND_CLASS)
+            try:
+                found = self.find_system(sys_key)
+                found.integrity_check(sys_typeclass, cat_typeclass, chan_typeclass, command_class)
+                found.at_start()
+            except ValueError as e:
+                self.create_system(sys_key, sys_typeclass, cat_typeclass, chan_typeclass, command_class)
 
-        try:
-            obj_channel_typeclass = settings.OBJECT_CHANNEL_TYPECLASS
-            self.ndb.obj_channel_typeclass = class_from_module(obj_channel_typeclass,
-                                                               defaultpaths=settings.TYPECLASS_PATHS)
+    def systems(self):
+        return [bridge.db_script for bridge in ChannelSystemBridge.objects.all()]
 
-        except Exception:
-            log_trace()
-            self.ndb.obj_channel_typeclass = AthanorObjectChannel
-
-        try:
-            acc_channel_typeclass = settings.ACCOUNT_CHANNEL_TYPECLASS
-            self.ndb.acc_channel_typeclass = class_from_module(acc_channel_typeclass,
-                                                               defaultpaths=settings.TYPECLASS_PATHS)
-
-        except Exception:
-            log_trace()
-            self.ndb.acc_channel_typeclass = AthanorAccountChannel
-
-    def systems(self, key):
-        return [bridge.db_script for bridge in ChannelSystemBridge.objects.filter(db_system_key=key)]
+    def create_system(self, sys_key, system_typeclass, category_typeclass, channel_typeclass, command_class):
+        sys_typeclass = class_from_module(system_typeclass)
+        new_system = sys_typeclass.create_channel_system(sys_key, category_typeclass, channel_typeclass, command_class)
 
     def find_system(self, sys_key):
+        if isinstance(sys_key, ChannelSystemBridge):
+            return sys_key.db_script
+        if isinstance(sys_key, AbstractChannelSystem):
+            return sys_key
         if (chan_sys := ChannelSystemBridge.objects.filter(db_system_key=sys_key).first()):
-            return chan_sys
+            return chan_sys.db_script
         raise ValueError(f"Channel System {sys_key} does not exist!")
 
     def create_category(self, session, sys_key, name):

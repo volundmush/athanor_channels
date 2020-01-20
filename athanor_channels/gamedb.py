@@ -34,7 +34,7 @@ class AthanorChannel(DefaultChannel, HasChanOps):
     """
     Abstract class for Account and Object channels. Don't use this directly!
     """
-    re_name = re.compile()
+    re_name = re.compile(r"(?i)^([A-Z]|[0-9]|\.|-|')+( ([A-Z]|[0-9]|\.|-|')+)*$")
 
     @property
     def bridge(self):
@@ -60,7 +60,7 @@ class AthanorChannel(DefaultChannel, HasChanOps):
         if hasattr(self, 'channel_bridge'):
             return
         ChannelBridge.objects.create(db_channel=self, db_name=clean_name, db_iname=clean_name.lower(), db_cname=name,
-                                     db_category=category, db_unique_key=unique_key)
+                                     db_category=category.channel_category_bridge, db_unique_key=unique_key)
 
     @classmethod
     def create_channel(cls, category, key, unique_key=None):
@@ -90,6 +90,9 @@ class AthanorChannel(DefaultChannel, HasChanOps):
         enactor = session.get_puppet_or_account()
         return enactor in self.moderators or self.access(session, 'moderate') or self.category.is_moderator(session)
 
+    def __str__(self):
+        return str(self.key)
+
 class AthanorAccountChannel(AthanorChannel):
 
     @property
@@ -104,8 +107,11 @@ class AthanorObjectChannel(AthanorChannel):
         return self.object_subscriptions
 
 
-class AthanorChannelCategory(AthanorOptionScript, HasChanOps):
-    re_name = re.compile()
+class AbstractChannelCategory(AthanorOptionScript, HasChanOps):
+    re_name = re.compile(r"(?i)^([A-Z]|[0-9]|\.|-|')+( ([A-Z]|[0-9]|\.|-|')+)*$")
+
+    def __str__(self):
+        return str(self.key)
 
     @property
     def bridge(self):
@@ -119,7 +125,7 @@ class AthanorChannelCategory(AthanorOptionScript, HasChanOps):
         if hasattr(self, 'channel_category_bridge'):
             return
         ChannelCategoryBridge.objects.create(db_script=self, db_name=clean_name, db_iname=clean_name.lower(), db_cname=name,
-                                     db_system=chan_sys, db_unique_key=unique_key)
+                                     db_system=chan_sys.channel_system_bridge, db_unique_key=unique_key)
 
     @classmethod
     def create_channel_category(cls, chan_sys, key):
@@ -127,9 +133,9 @@ class AthanorChannelCategory(AthanorOptionScript, HasChanOps):
         clean_key = str(key.clean())
         if '|' in clean_key:
             raise ValueError("Malformed ANSI in Channel Category Name.")
-        if not cls.re_abbr.match(clean_key):
+        if not cls.re_name.match(clean_key):
             raise ValueError("Channel Category names must be EXPLANATION.")
-        if chan_sys.channel_categories.filter(db_iname=clean_key.lower()).count():
+        if chan_sys.channel_system_bridge.channel_categories.filter(db_iname=clean_key.lower()).count():
             raise ValueError("Name conflicts with another Channel Category.")
         script, errors = cls.create(clean_key, persistent=True)
         if script:
@@ -201,9 +207,22 @@ class AthanorChannelCategory(AthanorOptionScript, HasChanOps):
         pass
 
 
-class AthanorChannelSystem(AthanorOptionScript, HasChanOps):
+class AccountChannelCategory(AbstractChannelCategory):
+    pass
+
+
+class ObjectChannelCategory(AbstractChannelCategory):
+    pass
+
+
+class AbstractChannelSystem(AthanorOptionScript, HasChanOps):
+
+    def __str__(self):
+        return str(self.key)
 
     def at_start(self):
+        if not hasattr(self, 'channel_system_bridge'):
+            return
         bri = self.channel_system_bridge
 
         try:
@@ -211,7 +230,7 @@ class AthanorChannelSystem(AthanorOptionScript, HasChanOps):
 
         except Exception:
             log_trace()
-            self.ndb.category_typeclass = AthanorChannelCategory
+            self.ndb.category_typeclass = AccountChannelCategory
 
         try:
             self.ndb.channel_typeclass = class_from_module(bri.db_channel_typeclass)
@@ -229,7 +248,7 @@ class AthanorChannelSystem(AthanorOptionScript, HasChanOps):
             if not category.is_typeclass(self.ndb.category_typeclass, exact=True):
                 category.swap_typeclass(self.ndb.category_typeclass)
             for channel in category.channels():
-                if not channel.is_typeclass(self.ndb.channel_typeclass, exact=True)
+                if not channel.is_typeclass(self.ndb.channel_typeclass, exact=True):
                     channel.swap_typeclass(self.ndb.channel_typeclass)
 
     def create_bridge(self, sys_key, category_typeclass, channel_typeclass, command_class):
@@ -245,29 +264,48 @@ class AthanorChannelSystem(AthanorOptionScript, HasChanOps):
         clean_key = str(key.clean())
         if '|' in clean_key:
             raise ValueError("Malformed ANSI in Channel System Name.")
-        if not cls.re_abbr.match(clean_key):
-            raise ValueError("Channel System Names must be EXPLANATION.")
         if ChannelSystemBridge.objects.filter(db_system_key=clean_key.lower()).count():
             raise ValueError("Name conflicts with another Channel System.")
         script, errors = cls.create(clean_key, persistent=True)
         if script:
-            script.create_bridge(clean_key, category_typeclass, channel_typeclass)
+            script.create_bridge(clean_key, category_typeclass, channel_typeclass, command_class)
+            script.at_start()
         else:
             raise ValueError(errors)
         return script
 
+    def integrity_check(self, sys_typeclass, cat_typeclass, chan_typeclass, command_class):
+        reload = False
+        if not self.is_typeclass(sys_typeclass, exact=True):
+            self.swap_typeclass(sys_typeclass)
+            reload = True
+        bri = self.channel_system_bridge
+        if not bri.category_typeclass == cat_typeclass:
+            bri.category_typeclass = cat_typeclass
+            reload = True
+        if not bri.channel_typeclass == chan_typeclass:
+            bri.channel_typeclass = chan_typeclass
+            reload = True
+        if not bri.command_class == command_class:
+            bri.command_class = command_class
+            reload = True
+        if reload:
+            self.at_start()
+
     def categories(self):
-        return [b.db_script for b in self.channel_categories.all().order_by('db_name')]
+        return [b.db_script for b in self.channel_system_bridge.channel_categories.all().order_by('db_name')]
 
     def visible_categories(self, checker):
-        return [cat for cat in self.categories() if cat.access(checker, 'see')]
+        return [cat for cat in self.categories() if cat.access(checker, 'see') or True]
 
     def find_category(self, session, name):
-        if isinstance(name, AthanorChannelCategory):
+        if isinstance(name, AbstractChannelCategory):
             return name
         if isinstance(name, ChannelCategoryBridge):
             return name.db_script
-        if (found := partial_match(name, self.visible_categories(session)))
+        print(f"SESSION: {session}. NAME: {name}")
+        print(f"VISIBLE CATEGORIES: {self.visible_categories(session)}")
+        if (found := partial_match(name, self.visible_categories(session))):
             return found
         raise ValueError(f"Cannot find Channel Category: {name}")
 
@@ -314,21 +352,29 @@ class AthanorChannelSystem(AthanorOptionScript, HasChanOps):
         return category.config(session, config_op, config_val)
 
     def create_channel(self, session, category, name):
-        category = self.find_category(session, name)
+        category = self.find_category(session, category)
         return category.create_channel(session, name)
 
     def rename_channel(self, session, category, name, new_name):
-        category = self.find_category(session, name)
+        category = self.find_category(session, category)
         return category.rename_channel(session, name, new_name)
 
     def delete_channel(self, session, category, name, verify_name):
-        category = self.find_category(session, name)
+        category = self.find_category(session, category)
         return category.delete_channel(session, name, verify_name)
 
     def lock_channel(self, session, category, name, lock_data):
-        category = self.find_category(session, name)
+        category = self.find_category(session, category)
         return category.lock_channel(session, name, lock_data)
 
     def config_channel(self, session, category, name, config_op, config_val):
-        category = self.find_category(session, name)
+        category = self.find_category(session, category)
         return category.config_channel(session, name, config_op, config_val)
+
+
+class AccountChannelSystem(AbstractChannelSystem):
+    pass
+
+
+class ObjectChannelSystem(AbstractChannelSystem):
+    pass

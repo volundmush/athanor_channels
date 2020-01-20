@@ -44,7 +44,7 @@ class ChannelBridge(SharedMemoryModel):
 
 class AbstractChannelSubscription(SharedMemoryModel):
     db_name = models.CharField(max_length=255, null=False, blank=False)
-    db_namespace = models.CharField(max_length=255, null=False, blank=false)
+    db_namespace = models.CharField(max_length=255, null=False, blank=False)
     db_codename = models.CharField(max_length=255, null=True, blank=False)
     db_ccodename = models.CharField(max_length=255, null=True, blank=False)
     db_icodename = models.CharField(max_length=255, null=True, blank=False)

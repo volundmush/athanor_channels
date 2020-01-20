@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
-VERSION_PATH = os.path.join("athanor_forum", "VERSION.txt")
+VERSION_PATH = os.path.join("athanor_channels", "VERSION.txt")
 OS_WINDOWS = os.name == "nt"
 
 
@@ -53,23 +53,23 @@ def package_data():
     Make sure we get everything.
     """
     file_set = []
-    for root, dirs, files in os.walk("athanor_forum"):
+    for root, dirs, files in os.walk("athanor_channels"):
         for f in files:
             if ".git" in f.split(os.path.normpath(os.path.join(root, f))):
                 # Prevent the repo from being added.
                 continue
-            file_name = os.path.relpath(os.path.join(root, f), "athanor_forum")
+            file_name = os.path.relpath(os.path.join(root, f), "athanor_channels")
             file_set.append(file_name)
     return file_set
 
 
 # setup the package
 setup(
-    name="athanor_forum",
+    name="athanor_channels",
     version=get_version(),
     author="Volund",
     maintainer="Volund",
-    url="https://github.com/volundmush/athanor_forum",
+    url="https://github.com/volundmush/athanor_channels",
     description="A library that builds on Evennia to provide popular and useful features for text-based multiplayer games (MUDs, MU*).",
     license="BSD",
     long_description="""
@@ -115,7 +115,7 @@ setup(
     ],
     python_requires=">=3.7",
     project_urls={
-        "Source": "https://github.com/volundmush/athanor_forum",
+        "Source": "https://github.com/volundmush/athanor_channels",
         "For": "https://github.com/evennia/evennia",
         "Issue tracker": "https://github.com/evennia/evennia/issues",
         "Chat": "http://www.evennia.com/chat-redirect-3",
