@@ -63,7 +63,6 @@ class AccountChannelSubscription(AbstractChannelSubscription):
 
     class Meta:
         unique_together = (('db_account', 'db_namespace', 'db_name'),
-                           ('db_account', 'db_channel'),
                            ('db_channel', 'db_icodename'))
 
 
@@ -73,5 +72,4 @@ class ObjectChannelSubscription(AbstractChannelSubscription):
 
     class Meta:
         unique_together = (('db_object', 'db_namespace', 'db_name'),
-                           ('db_object', 'db_channel'),
                            ('db_channel', 'db_icodename'))

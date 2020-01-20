@@ -180,31 +180,37 @@ class AbstractChannelUseCommand(HasChannelSystem, HasDisplayList):
     re_alias = re.compile(r"(?i)^([^\/\s])+$")
 
     def switch_join(self):
-        pass
+        target = self.target_channel(self.lhs)
+        err = f"Usage: {self.key}/join <Category>/<Channel>=<alias> - Aliases must be simple, disallowing whitespace or /"
+        if not len(target) == 3:
+            raise ValueError(err)
+        if not self.re_alias.match(self.rhs):
+            raise ValueError(err)
+        self.caller.channels.add(target[2], self.rhs)
 
     def switch_leave(self):
-        pass
+        self.caller.channels.remove(self.args)
 
     def switch_codename(self):
-        pass
+        self.caller.channels.codename(self.lhs, self.rhs)
 
     def switch_title(self):
-        pass
+        self.caller.channels.title(self.lhs, self.rhs)
 
     def switch_altname(self):
-        pass
+        self.caller.channels.altname(self.lhs, self.rhs)
 
     def switch_mute(self):
-        pass
+        self.caller.channels.mute(self.args)
 
     def switch_unmute(self):
-        pass
+        self.caller.channels.unmute(self.args)
 
     def switch_on(self):
-        pass
+        self.caller.channels.on(self.args)
 
     def switch_off(self):
-        pass
+        self.caller.channels.off(self.args)
 
 
 class CmdAccountChannelUse(AbstractChannelUseCommand):
