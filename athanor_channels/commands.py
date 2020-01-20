@@ -1,3 +1,4 @@
+import re
 from evennia import GLOBAL_SCRIPTS
 
 from evennia.comms.channelhandler import ChannelCommand
@@ -172,3 +173,47 @@ class CmdObjectChannelAdmin(AbstractChannelAdminCommand):
     def user_parse(self, user):
         system = GLOBAL_SCRIPTS.character
         return system.find_character(user)
+
+
+class AbstractChannelUseCommand(HasChannelSystem, HasDisplayList):
+    switch_options = ('join', 'leave', 'title', 'altname', 'mute', 'unmute', 'on', 'off')
+    re_alias = re.compile(r"(?i)^([^\/\s])+$")
+
+    def switch_join(self):
+        pass
+
+    def switch_leave(self):
+        pass
+
+    def switch_codename(self):
+        pass
+
+    def switch_title(self):
+        pass
+
+    def switch_altname(self):
+        pass
+
+    def switch_mute(self):
+        pass
+
+    def switch_unmute(self):
+        pass
+
+    def switch_on(self):
+        pass
+
+    def switch_off(self):
+        pass
+
+
+class CmdAccountChannelUse(AbstractChannelUseCommand):
+    account_caller = True
+    system_key = 'account'
+    key = '@achannel'
+
+
+class CmdObjectChannelUse(AbstractChannelUseCommand):
+    account_caller = False
+    system_key = 'object'
+    key = '@channel'
