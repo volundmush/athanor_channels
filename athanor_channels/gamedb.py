@@ -11,6 +11,7 @@ from athanor.utils.text import partial_match
 from athanor_channels.models import ChannelSystemBridge, ChannelCategoryBridge, ChannelBridge
 from athanor_channels.commands import AccountChannelCommand
 
+
 class HasChanOps(object):
     """
     Limited Mixin for providing some permissions storage to the Channel System.
@@ -55,6 +56,12 @@ class AthanorChannel(DefaultChannel, HasChanOps):
         property is a cache of subscriptions that are actually actively listening to the channel.
         """
         return set()
+
+    def add_listener(self, listener):
+        self.listeners.add(listener)
+
+    def remove_listener(self, listener):
+        self.listeners.remove(listener)
 
     def create_bridge(self, category, name, clean_name, unique_key=None):
         if hasattr(self, 'channel_bridge'):

@@ -5,7 +5,7 @@ from evennia.comms.channelhandler import ChannelCommand
 from athanor.commands.command import AthanorCommand
 
 
-class HasChannelSystem(object):
+class HasChannelSystem(AthanorCommand):
 
     def at_pre_cmd(self):
         self.chan_sys = GLOBAL_SCRIPTS.channel.find_system(self.system_key)
@@ -28,7 +28,16 @@ class HasChannelSystem(object):
 class HasDisplayList(HasChannelSystem):
 
     def display_channel_list(self):
-        pass
+        if not (categories := self.chan_sys.visible_categories(self.session)):
+            raise ValueError("No categories to display!")
+        message = list()
+        message.append(self.styled_header(f"{self.chan_sys} Channel Categories"))
+        for category in categories:
+            message.append(self.styled_separator(f"{category} Channels"))
+            for channel in category.visible_channels(self.session):
+                message.append(str(channel))
+        message.append(self._blank_footer)
+        self.msg("\n".join(str(l) for l in message))
 
     def display_channel_info(self):
         pass
@@ -40,7 +49,37 @@ class HasDisplayList(HasChannelSystem):
 
 
 class AbstractChannelCommand(HasChannelSystem, ChannelCommand):
-    pass
+    switch_options = ('who', 'leave', 'title', 'altname', 'mute', 'unmute', 'on', 'off')
+
+    def switch_main(self):
+        pass
+
+    def switch_leave(self):
+        self.caller.channels.remove(self.subscription)
+
+    def switch_codename(self):
+        self.caller.channels.codename(self.subscription, self.args)
+
+    def switch_title(self):
+        self.caller.channels.title(self.subscription, self.args)
+
+    def switch_altname(self):
+        self.caller.channels.altname(self.subscription, self.args)
+
+    def switch_mute(self):
+        self.caller.channels.mute(self.subscription)
+
+    def switch_unmute(self):
+        self.caller.channels.unmute(self.subscription)
+
+    def switch_on(self):
+        self.caller.channels.on(self.subscription)
+
+    def switch_off(self):
+        self.caller.channels.off(self.subscription)
+
+    def switch_who(self):
+        self.caller.channels.who(self.subscription)
 
 
 class AccountChannelCommand(AbstractChannelCommand):
@@ -52,7 +91,7 @@ class ObjectChannelCommand(AbstractChannelCommand):
     system_key = 'object'
 
 
-class AbstractChannelAdminCommand(HasDisplayList, AthanorCommand):
+class AbstractChannelAdminCommand(HasDisplayList):
     """
 
     """
@@ -175,7 +214,7 @@ class CmdObjectChannelAdmin(AbstractChannelAdminCommand):
         return system.find_character(user)
 
 
-class AbstractChannelUseCommand(HasChannelSystem, HasDisplayList):
+class AbstractChannelUseCommand(HasDisplayList):
     switch_options = ('join', 'leave', 'title', 'altname', 'mute', 'unmute', 'on', 'off')
     re_alias = re.compile(r"(?i)^([^\/\s])+$")
 
