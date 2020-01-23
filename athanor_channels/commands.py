@@ -1,8 +1,9 @@
 import re
+
 from evennia import GLOBAL_SCRIPTS
 
-from evennia.comms.channelhandler import ChannelCommand
 from athanor.commands.command import AthanorCommand
+from athanor.utils.text import Speech
 
 
 class HasChannelSystem(AthanorCommand):
@@ -48,11 +49,15 @@ class HasDisplayList(HasChannelSystem):
         return self.display_channel_info()
 
 
-class AbstractChannelCommand(HasChannelSystem, ChannelCommand):
+class AbstractChannelCommand(HasChannelSystem, AthanorCommand):
     switch_options = ('who', 'leave', 'title', 'altname', 'mute', 'unmute', 'on', 'off')
 
     def switch_main(self):
-        pass
+        subscrip = self.subscription
+        channel = subscrip.db_channel
+        speech_obj = Speech(speaker=self.caller, speech_text=self.args, mode="channel", title=subscrip.db_title,
+                            alternate_name=subscrip.db_altname, name_dict=channel.name_map)
+        channel.broadcast(speech_obj, self.session)
 
     def switch_leave(self):
         self.caller.channels.remove(self.subscription)

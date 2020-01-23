@@ -100,7 +100,27 @@ class AthanorChannel(DefaultChannel, HasChanOps):
     def __str__(self):
         return str(self.key)
 
+    def get_sender(self, sending_session=None):
+        if not sending_session:
+            return None
+        return sending_session.get_puppet_or_account()
+
+    def render_prefix(self, recipient, sender):
+        return f"<{self.key}>"
+
+    def broadcast(self, text, sending_session=None):
+        sender = self.get_sender(sending_session)
+        for listener in self.listeners:
+            prefix = self.render_prefix(listener, sender)
+            listener.msg(f"{prefix} {text.render(viewer=listener)}")
+
+
 class AthanorAccountChannel(AthanorChannel):
+
+    def get_sender(self, sending_session=None):
+        if not sending_session:
+            return None
+        return sending_session.get_account()
 
     @property
     def subscriptions(self):
@@ -108,6 +128,11 @@ class AthanorAccountChannel(AthanorChannel):
 
 
 class AthanorObjectChannel(AthanorChannel):
+
+    def get_sender(self, sending_session=None):
+        if not sending_session:
+            return None
+        return sending_session.get_puppet()
 
     @property
     def subscriptions(self):
