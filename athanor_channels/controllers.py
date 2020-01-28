@@ -2,21 +2,15 @@ from django.conf import settings
 
 from evennia.utils.utils import class_from_module
 
-from athanor.gamedb.scripts import AthanorGlobalScript
+from athanor.controllers.base import AthanorController
 from athanor_channels.models import ChannelSystemBridge
 from athanor_channels.gamedb import AbstractChannelSystem
 
 
-class AthanorChannelController(AthanorGlobalScript):
+class AthanorChannelController(AthanorController):
     system_name = 'CHANNEL'
-    option_dict = {
-        'system_locks': ('Locks governing Faction System.', 'Lock',
-                         "create:perm(Admin);delete:perm(Admin);admin:perm(Admin)"),
-        'faction_locks': ('Default/Fallback locks for all Factions.', 'Lock',
-                        "see:all();invite:fmember();accept:fmember();apply:all();admin:fsuperuser()")
-    }
 
-    def at_start(self):
+    def do_load(self):
         """
         This loads the fallbacks for when more specific settings are not defined in settings.py.
         """
