@@ -31,7 +31,7 @@ class HasChanOps(object):
         return self.get_set_attribute('moderators')
 
 
-class AthanorChannel(DefaultChannel, HasChanOps):
+class AbstractChannel(DefaultChannel, HasChanOps):
     """
     Abstract class for Account and Object channels. Don't use this directly!
     """
@@ -113,30 +113,6 @@ class AthanorChannel(DefaultChannel, HasChanOps):
         for listener in self.listeners:
             prefix = self.render_prefix(listener, sender)
             listener.msg(f"{prefix} {text.render(viewer=listener)}")
-
-
-class AthanorAccountChannel(AthanorChannel):
-
-    def get_sender(self, sending_session=None):
-        if not sending_session:
-            return None
-        return sending_session.get_account()
-
-    @property
-    def subscriptions(self):
-        return self.account_subscriptions
-
-
-class AthanorObjectChannel(AthanorChannel):
-
-    def get_sender(self, sending_session=None):
-        if not sending_session:
-            return None
-        return sending_session.get_puppet()
-
-    @property
-    def subscriptions(self):
-        return self.object_subscriptions
 
 
 class AbstractChannelCategory(AthanorOptionScript, HasChanOps):
@@ -239,14 +215,6 @@ class AbstractChannelCategory(AthanorOptionScript, HasChanOps):
         pass
 
 
-class AccountChannelCategory(AbstractChannelCategory):
-    pass
-
-
-class ObjectChannelCategory(AbstractChannelCategory):
-    pass
-
-
 class AbstractChannelSystem(AthanorOptionScript, HasChanOps):
 
     def __str__(self):
@@ -262,13 +230,13 @@ class AbstractChannelSystem(AthanorOptionScript, HasChanOps):
 
         except Exception:
             log_trace()
-            self.ndb.category_typeclass = AccountChannelCategory
+            self.ndb.category_typeclass = AbstractChannelCategory
 
         try:
             self.ndb.channel_typeclass = class_from_module(bri.db_channel_typeclass)
         except Exception:
             log_trace()
-            self.ndb.channel_typeclass = AthanorAccountChannel
+            self.ndb.channel_typeclass = AbstractChannel
 
         try:
             self.ndb.command_class = class_from_module(bri.db_command_class)
@@ -402,11 +370,3 @@ class AbstractChannelSystem(AthanorOptionScript, HasChanOps):
     def config_channel(self, session, category, name, config_op, config_val):
         category = self.find_category(session, category)
         return category.config_channel(session, name, config_op, config_val)
-
-
-class AccountChannelSystem(AbstractChannelSystem):
-    pass
-
-
-class ObjectChannelSystem(AbstractChannelSystem):
-    pass

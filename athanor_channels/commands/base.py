@@ -1,6 +1,5 @@
 import re
 
-from evennia import GLOBAL_SCRIPTS
 
 from athanor.commands.command import AthanorCommand
 from athanor.utils.text import Speech
@@ -85,15 +84,6 @@ class AbstractChannelCommand(HasChannelSystem, AthanorCommand):
 
     def switch_who(self):
         self.caller.channels.who(self.subscription)
-
-
-class AccountChannelCommand(AbstractChannelCommand):
-    system_key = 'account'
-    account_caller = True
-
-
-class ObjectChannelCommand(AbstractChannelCommand):
-    system_key = 'object'
 
 
 class AbstractChannelAdminCommand(HasDisplayList):
@@ -199,26 +189,6 @@ class AbstractChannelAdminCommand(HasDisplayList):
             self.controllers.get('channel').ban_channel(self.session, target[0], target[1], target[2], subjects)
 
 
-class CmdAccountChannelAdmin(AbstractChannelAdminCommand):
-    account_caller = True
-    system_key = 'account'
-    key = '@achanadm'
-
-    def user_parse(self, user):
-        system = self.controllers.get('account').
-        return system.find_account(user)
-
-
-class CmdObjectChannelAdmin(AbstractChannelAdminCommand):
-    account_caller = False
-    system_key = 'object'
-    key = '@chanadm'
-
-    def user_parse(self, user):
-        system = self.controllers.get('character').
-        return system.find_character(user)
-
-
 class AbstractChannelUseCommand(HasDisplayList):
     switch_options = ('join', 'leave', 'title', 'altname', 'mute', 'unmute', 'on', 'off')
     re_alias = re.compile(r"(?i)^([^\/\s])+$")
@@ -257,13 +227,6 @@ class AbstractChannelUseCommand(HasDisplayList):
         self.caller.channels.off(self.args)
 
 
-class CmdAccountChannelUse(AbstractChannelUseCommand):
-    account_caller = True
-    system_key = 'account'
-    key = '@achannel'
 
 
-class CmdObjectChannelUse(AbstractChannelUseCommand):
-    account_caller = False
-    system_key = 'object'
-    key = '@channel'
+

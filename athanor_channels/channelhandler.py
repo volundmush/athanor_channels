@@ -102,6 +102,9 @@ class ObjectChannelHandler(AbstractChannelHandler):
 
 
 class GlobalChannelHandler(object):
+    """
+    This actually replaces the Evennia CHANNEL_HANDLER_CLASS
+    """
 
     def add(self, channel):
         pass

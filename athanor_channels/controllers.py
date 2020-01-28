@@ -4,7 +4,7 @@ from evennia.utils.utils import class_from_module
 
 from athanor.controllers.base import AthanorController
 from athanor_channels.models import ChannelSystemBridge
-from athanor_channels.gamedb import AbstractChannelSystem
+from athanor_channels.channels import AbstractChannelSystem
 
 
 class AthanorChannelController(AthanorController):
