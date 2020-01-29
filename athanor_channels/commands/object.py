@@ -3,6 +3,8 @@ from athanor_channels.commands.base import AbstractChannelAdminCommand, Abstract
 
 class ObjectChannelCommand(AbstractChannelCommand):
     system_key = 'object'
+    help_category = "Character Channel Aliases"
+    controller = 'character'
 
 
 class CmdObjectChannelAdmin(AbstractChannelAdminCommand):

@@ -50,12 +50,14 @@ class HasDisplayList(HasChannelSystem):
 
 class AbstractChannelCommand(HasChannelSystem, AthanorCommand):
     switch_options = ('who', 'leave', 'title', 'altname', 'mute', 'unmute', 'on', 'off')
+    controller = None
 
     def switch_main(self):
         subscrip = self.subscription
         channel = subscrip.db_channel
+        name_map = self.controllers.get('character').name_map
         speech_obj = Speech(speaker=self.caller, speech_text=self.args, mode="channel", title=subscrip.db_title,
-                            alternate_name=subscrip.db_altname, name_dict=channel.name_map)
+                            alternate_name=subscrip.db_altname, controller=self.controller)
         channel.broadcast(speech_obj, self.session)
 
     def switch_leave(self):

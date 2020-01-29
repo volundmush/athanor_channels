@@ -4,7 +4,8 @@ from athanor_channels.commands.base import AbstractChannelAdminCommand, Abstract
 class AccountChannelCommand(AbstractChannelCommand):
     system_key = 'account'
     account_caller = True
-
+    help_category = "Account Channel Aliases"
+    controller = 'account'
 
 class CmdAccountChannelAdmin(AbstractChannelAdminCommand):
     account_caller = True

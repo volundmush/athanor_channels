@@ -4,7 +4,7 @@ from evennia.utils.utils import class_from_module
 
 from athanor.controllers.base import AthanorController
 from athanor_channels.models import ChannelSystemBridge
-from athanor_channels.channels import AbstractChannelSystem
+from athanor_channels.channels.base import AbstractChannelSystem
 
 
 class AthanorChannelController(AthanorController):
@@ -16,10 +16,10 @@ class AthanorChannelController(AthanorController):
         """
 
         for sys_key, sys_data in settings.CHANNEL_SYSTEMS.items():
-            sys_typeclass = sys_data.get("system_typeclass", settings.CHANNEL_SYSTEM_TYPECLASS)
-            cat_typeclass = sys_data.get("category_typeclass", settings.CHANNEL_CATEGORY_TYPECLASS)
-            chan_typeclass = sys_data.get("channel_typeclass", settings.CHANNEL_CHANNEL_TYPECLASS)
-            command_class = sys_data.get("command_class", settings.CHANNEL_COMMAND_CLASS)
+            sys_typeclass = sys_data.get("system_typeclass")
+            cat_typeclass = sys_data.get("category_typeclass")
+            chan_typeclass = sys_data.get("channel_typeclass")
+            command_class = sys_data.get("command_class")
             try:
                 found = self.find_system(sys_key)
                 found.integrity_check(sys_typeclass, cat_typeclass, chan_typeclass, command_class)

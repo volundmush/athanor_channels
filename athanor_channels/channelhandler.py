@@ -106,6 +106,11 @@ class GlobalChannelHandler(object):
     This actually replaces the Evennia CHANNEL_HANDLER_CLASS
     """
 
+    def __init__(self):
+        self._cached_channel_cmds = {}
+        self._cached_cmdsets = {}
+        self._cached_channels = {}
+
     def add(self, channel):
         pass
 

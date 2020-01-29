@@ -1,6 +1,7 @@
 from athanor_channels.channels.base import AbstractChannel, AbstractChannelCategory, AbstractChannelSystem
 
-class AthanorObjectChannel(AbstractChannel):
+
+class ObjectChannel(AbstractChannel):
 
     def get_sender(self, sending_session=None):
         if not sending_session:

@@ -9,7 +9,6 @@ from athanor.gamedb.scripts import AthanorOptionScript
 from athanor.utils.text import partial_match
 
 from athanor_channels.models import ChannelSystemBridge, ChannelCategoryBridge, ChannelBridge
-from athanor_channels.commands import AccountChannelCommand
 
 
 class HasChanOps(object):
@@ -162,7 +161,7 @@ class AbstractChannelCategory(AthanorOptionScript, HasChanOps):
         return [channel for channel in self.channels() if channel.access(session, 'listen')]
 
     def find_channel(self, session, name):
-        if isinstance(name, AthanorChannel):
+        if isinstance(name, AbstractChannel):
             return name
         if isinstance(name, ChannelBridge):
             return name.db_channel
@@ -242,7 +241,7 @@ class AbstractChannelSystem(AthanorOptionScript, HasChanOps):
             self.ndb.command_class = class_from_module(bri.db_command_class)
         except Exception:
             log_trace()
-            self.ndb.command_class = AccountChannelCommand
+            self.ndb.command_class = AbstractChannelCommand
 
         for category in self.categories():
             if not category.is_typeclass(self.ndb.category_typeclass, exact=True):

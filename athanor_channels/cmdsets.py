@@ -1,6 +1,7 @@
 from evennia.commands.default import comms
 from athanor.cmdsets.base import AthanorCmdSet
-from athanor_channels.commands import CmdAccountChannelAdmin, CmdObjectChannelAdmin, CmdAccountChannelUse, CmdObjectChannelUse
+from athanor_channels.commands.account import CmdAccountChannelAdmin, CmdAccountChannelUse
+from athanor_channels.commands.object import CmdObjectChannelAdmin, CmdObjectChannelUse
 
 
 class AthanorAccountChannelCmdSet(AthanorCmdSet):
