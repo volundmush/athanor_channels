@@ -1,4 +1,4 @@
-from athanor_channels.channelhandler import AccountChannelHandler, ObjectChannelHandler
+from athanor_channels.channelhandler import AccountChannelHandler, CharacterChannelHandler
 from evennia.utils.utils import lazy_property
 
 
@@ -9,8 +9,8 @@ class AccountChannelMixin(object):
         return AccountChannelHandler(self)
 
 
-class ObjectChannelMixin(object):
+class CharacterChannelMixin(object):
 
     @lazy_property
     def channels(self):
-        return ObjectChannelHandler(self)
+        return CharacterChannelHandler(self)

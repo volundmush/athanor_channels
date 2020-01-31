@@ -1,7 +1,7 @@
 from athanor_channels.channels.base import AbstractChannel, AbstractChannelCategory, AbstractChannelSystem
 
 
-class ObjectChannel(AbstractChannel):
+class CharacterChannel(AbstractChannel):
 
     def get_sender(self, sending_session=None):
         if not sending_session:
@@ -13,9 +13,9 @@ class ObjectChannel(AbstractChannel):
         return self.object_subscriptions
 
 
-class ObjectChannelCategory(AbstractChannelCategory):
+class CharacterChannelCategory(AbstractChannelCategory):
     pass
 
 
-class ObjectChannelSystem(AbstractChannelSystem):
+class CharacterChannelSystem(AbstractChannelSystem):
     pass

@@ -97,8 +97,8 @@ class AccountChannelHandler(AbstractChannelHandler):
     namespace = 'account'
 
 
-class ObjectChannelHandler(AbstractChannelHandler):
-    namespace = 'object'
+class CharacterChannelHandler(AbstractChannelHandler):
+    namespace = 'character'
 
 
 class GlobalChannelHandler(object):
