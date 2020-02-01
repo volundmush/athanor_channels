@@ -14,15 +14,15 @@ def init_settings(settings):
         "channel_typeclass": "athanor_channels.channels.account.AccountChannel",
         "command_class": "athanor_channels.commands.account.AccountChannelCommand"
     }
-    settings.CHANNEL_SYSTEMS["object"] = {
+    settings.CHANNEL_SYSTEMS["character"] = {
         'name': "Character Channels",
-        'system_typeclass': "athanor_channels.channels.object.ObjectChannelSystem",
-        "category_typeclass": "athanor_channels.channels.object.ObjectChannelCategory",
-        "channel_typeclass": "athanor_channels.channels.object.ObjectChannel",
-        "command_class": "athanor_channels.commands.object.ObjectChannelCommand"
+        'system_typeclass': "athanor_channels.channels.character.CharacterChannelSystem",
+        "category_typeclass": "athanor_channels.channels.character.CharacterChannelCategory",
+        "channel_typeclass": "athanor_channels.channels.character.CharacterChannel",
+        "command_class": "athanor_channels.commands.character.CharacterChannelCommand"
     }
     settings.GAMEDB_MIXINS["ACCOUNT"].append("athanor_channels.mixins.AccountChannelMixin")
-    settings.GAMEDB_MIXINS["CHARACTER"].append("athanor_channels.mixins.ObjectChannelMixin")
+    settings.GAMEDB_MIXINS["CHARACTER"].append("athanor_channels.mixins.CharacterChannelMixin")
     settings.INLINEFUNC_MODULES.append('athanor_channels.inlinefuncs')
     settings.OPTIONS_ACCOUNT_DEFAULT['quotes_channel'] = ("Color for Quotation marks on Channels.", "Color", 'n')
     settings.OPTIONS_ACCOUNT_DEFAULT['speech_channel'] = ("Color for Dialogue on Channels.", "Color", 'n')
