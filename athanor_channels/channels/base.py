@@ -7,27 +7,36 @@ from evennia.utils.logger import log_trace
 
 from athanor.gamedb.scripts import AthanorOptionScript
 from athanor.utils.text import partial_match
+from athanor.utils.mixins import HasAttributeGetCreate
 
 from athanor_channels.models import ChannelSystemBridge, ChannelCategoryBridge, ChannelBridge
+from athanor_channels import messages as cmsg
+from athanor_channels.commands.base import AbstractChannelCommand
 
 
-class HasChanOps(object):
+class HasChanOps(HasAttributeGetCreate):
     """
     Limited Mixin for providing some permissions storage to the Channel System.
     """
-
-    def get_set_attribute(self, attrname):
-        if not self.attributes.has(key=attrname):
-            self.attributes.add(key=attrname, value=set())
-        return self.attributes.get(key=attrname)
-
     @lazy_property
     def operators(self):
-        return self.get_set_attribute('operators')
+        return self.get_or_create_attribute('operators', default=set())
 
     @lazy_property
     def moderators(self):
-        return self.get_set_attribute('moderators')
+        return self.get_or_create_attribute('moderators', default=set())
+
+    def add_moderator(self, session, user):
+        pass
+
+    def remove_moderator(self, session, user):
+        pass
+
+    def add_operator(self, session, user):
+        pass
+
+    def remove_operator(self, session, user):
+        pass
 
 
 class AbstractChannel(DefaultChannel, HasChanOps):
@@ -46,7 +55,7 @@ class AbstractChannel(DefaultChannel, HasChanOps):
 
     @property
     def system(self):
-        return self.bridge.db_category.db_system.db_script
+        return self.category.system
 
     @lazy_property
     def listeners(self):
@@ -85,8 +94,31 @@ class AbstractChannel(DefaultChannel, HasChanOps):
             raise ValueError(errors)
         return channel
 
-    def rename(self, new_name):
-        pass
+    def rename(self, key):
+        """
+        Renames a channel and updates all relevant fields.
+
+        Args:
+            key (str): The channel's new name. Can include ANSI codes.
+
+        Returns:
+            key (ANSIString): The successful key set.
+        """
+        key = ANSIString(key)
+        clean_key = str(key.clean())
+        if '|' in clean_key:
+            raise ValueError("Malformed ANSI in Channel Name.")
+        if not self.re_name.match(clean_key):
+            raise ValueError("Channel name does not meet standards. Avoid double spaces and special characters.")
+        bridge = self.bridge
+        if bridge.db_category.channels.filter(db_iname=clean_key.lower()).exclude(id=bridge.id).count():
+            raise ValueError("Name conflicts with another Character.")
+        self.key = clean_key
+        bridge.db_name = clean_key
+        bridge.db_iname = clean_key.lower()
+        bridge.db_cname = key
+        bridge.save(update_fields=['db_name', 'db_iname', 'db_cname'])
+        return key
 
     def is_operator(self, session):
         enactor = session.get_puppet_or_account()
@@ -112,6 +144,21 @@ class AbstractChannel(DefaultChannel, HasChanOps):
         for listener in self.listeners:
             prefix = self.render_prefix(listener, sender)
             listener.msg(f"{prefix} {text.render(viewer=listener)}")
+
+    def check_access(self, checker, lock):
+        return self.access(checker, lock) or self.category.access(checker, lock)
+
+    def lock(self, session, lock_data):
+        if not (enactor := session.get_account()) or not (enactor.check_lock("oper(channel_lock)")
+                                                          or self.check_access(enactor, 'control')):
+            raise ValueError("Permission denied.")
+        self.locks.add(lock_data)
+        cmsg.LockChannelMessage(source=enactor, target=self, lock_string=lock_data).send()
+
+    def config(self, session, config_op, config_val):
+        if not (enactor := session.get_account()) or not (enactor.check_lock("oper(channel_config)")
+                                                          or self.check_access(enactor, 'control')):
+            raise ValueError("Permission denied.")
 
 
 class AbstractChannelCategory(AthanorOptionScript, HasChanOps):
@@ -151,8 +198,31 @@ class AbstractChannelCategory(AthanorOptionScript, HasChanOps):
             raise ValueError(errors)
         return script
 
-    def rename(self, new_name):
-        pass
+    def rename(self, key):
+        """
+        Renames a channel category and updates all relevant fields.
+
+        Args:
+            key (str): The category's new name. Can include ANSI codes.
+
+        Returns:
+            key (ANSIString): The successful key set.
+        """
+        key = ANSIString(key)
+        clean_key = str(key.clean())
+        if '|' in clean_key:
+            raise ValueError("Malformed ANSI in Channel CategoryName.")
+        if not self.re_name.match(clean_key):
+            raise ValueError("Channel Category name does not meet standards. Avoid double spaces and special characters.")
+        bridge = self.bridge
+        if bridge.db_category.channels.filter(db_iname=clean_key.lower()).exclude(id=bridge.id).count():
+            raise ValueError("Name conflicts with another Channel Category.")
+        self.key = clean_key
+        bridge.db_name = clean_key
+        bridge.db_iname = clean_key.lower()
+        bridge.db_cname = key
+        bridge.save(update_fields=['db_name', 'db_iname', 'db_cname'])
+        return key
 
     def channels(self):
         return [c.db_channel for c in self.bridge.channels.all()]
@@ -169,6 +239,9 @@ class AbstractChannelCategory(AthanorOptionScript, HasChanOps):
             return found
         raise ValueError(f"Cannot Find Channel: {name}")
 
+    def check_access(self, checker, lock):
+        return self.access(checker, lock) or self.system.access(checker, lock)
+
     def is_operator(self, session):
         enactor = session.get_puppet_or_account()
         return enactor in self.operators or self.access(session, 'control') or self.system.is_operator(session)
@@ -178,40 +251,53 @@ class AbstractChannelCategory(AthanorOptionScript, HasChanOps):
         return enactor in self.moderators or self.access(session, 'moderate') or self.system.is_moderator(session)
 
     def create_channel(self, session, name):
-        if not self.is_operator(session):
+        if not (enactor := session.get_account()) or not (enactor.check_lock("oper(channel_create)")
+                                                          or self.check_access(enactor, 'control')):
             raise ValueError("Permission denied.")
         new_channel = self.system.ndb.channel_typeclass.create_channel(self, name)
+        cmsg.CreateChannelMessage(source=enactor, target=new_channel).send()
+        return new_channel
 
     def rename_channel(self, session, name, new_name):
         channel = self.find_channel(session, name)
+        if not (enactor := session.get_account()) or not (enactor.check_lock("oper(channel_rename)")
+                                                          or self.check_access(enactor, 'control')):
+            raise ValueError("Permission denied.")
         if not self.is_operator(session):
             raise ValueError("Permission denied.")
         old_name = str(channel)
         changed_name = channel.rename(new_name)
+        cmsg.RenameChannelMessage(source=enactor, target=channel, old_name=old_name).send()
 
     def delete_channel(self, session, name, verify_name):
         channel = self.find_channel(session, name)
-        if not self.is_operator(session):
+        if not (enactor := session.get_account()) or not (enactor.check_lock("oper(channel_rename)")
+                                                          or self.check_access(enactor, 'control')):
             raise ValueError("Permission denied.")
         if not verify_name and verify_name.lower() == str(channel).lower():
             raise ValueError("Verify value does not match channel name!")
+        cmsg.DeleteChannelMessage(source=enactor, target=channel).send()
         channel.delete()
 
     def lock_channel(self, session, name, lock_data):
         channel = self.find_channel(session, name)
-        if not self.is_operator(session):
-            raise ValueError("Permission denied.")
-        channel.lock(session, lock_data)
+        return channel.lock(session, lock_data)
 
     def config_channel(self, session, name, config_op, config_val):
         channel = self.find_channel(session, name)
-        channel.config(session, config_op, config_val)
+        return channel.config(session, config_op, config_val)
 
     def lock(self, session, lock_data):
-        pass
+        if not (enactor := session.get_account()) or not (enactor.check_lock("oper(channel_category_lock)")
+                                                          or self.check_access(enactor, 'control')):
+            raise ValueError("Permission denied.")
+        self.locks.add(lock_data)
+        cmsg.LockCategoryMessage(source=enactor, target=self, lock_string=lock_data).send()
 
     def config(self, session, config_op, config_val):
-        pass
+        if not (enactor := session.get_account()) or not (enactor.check_lock("oper(channel_category_config)")
+                                                          or self.check_access(enactor, 'control')):
+            raise ValueError("Permission denied.")
 
 
 class AbstractChannelSystem(AthanorOptionScript, HasChanOps):
@@ -224,6 +310,8 @@ class AbstractChannelSystem(AthanorOptionScript, HasChanOps):
             return
         bri = self.channel_system_bridge
 
+        # Some safeguards are set here but they're really not how this works. These
+        # imports are really not allowed to fail.
         try:
             self.ndb.category_typeclass = class_from_module(bri.db_category_typeclass)
 
@@ -243,6 +331,8 @@ class AbstractChannelSystem(AthanorOptionScript, HasChanOps):
             log_trace()
             self.ndb.command_class = AbstractChannelCommand
 
+        # This ensures that all categories and channels in this system will be using the proper
+        # typeclass.
         for category in self.categories():
             if not category.is_typeclass(self.ndb.category_typeclass, exact=True):
                 category.swap_typeclass(self.ndb.category_typeclass)
@@ -317,37 +407,39 @@ class AbstractChannelSystem(AthanorOptionScript, HasChanOps):
         return enactor in self.moderators or self.access(session, 'moderate')
 
     def create_category(self, session, name):
-        if not self.access(session, 'control'):
+        if not (enactor := session.get_account()) or not (enactor.check_lock("oper(channel_category_create)") 
+                                                          or self.is_operator(session)):
             raise ValueError("Permission denied.")
         new_category = self.ndb.category_typeclass.create_channel_category(self, name)
+        cmsg.CreateCategoryMessage(source=enactor, target=new_category).send()
         return new_category
 
     def rename_category(self, session, name, new_name):
         category = self.find_category(session, name)
-        if not (category.access(session, 'control') or self.access(session, 'control')):
+        if not (enactor := session.get_account()) or not (enactor.check_lock("oper(channel_category_rename)")
+                                                          or self.is_operator(session)):
             raise ValueError("Permission denied.")
         old_name = str(category)
         changed_name = category.rename(new_name)
+        cmsg.RenameCategoryMessage(source=enactor, target=category, old_name=old_name).send()
         return changed_name
 
     def delete_category(self, session, name, verify_name):
         category = self.find_category(session, name)
-        if not (category.access(session, 'control') or self.access(session, 'control')):
+        if not (enactor := session.get_account()) or not (enactor.check_lock("oper(channel_category_delete)")
+                                                          or self.is_operator(session)):
             raise ValueError("Permission denied.")
         if not verify_name and not verify_name.lower() == str(category).lower():
             raise ValueError("Confirmation value must match Category name!")
+        cmsg.DeleteCategoryMessage(source=enactor, target=category).send()
         category.delete()
 
     def lock_category(self, session, name, lock_data):
         category = self.find_category(session, name)
-        if not (category.access(session, 'control') or self.access(session, 'control')):
-            raise ValueError("Permission denied.")
         category.lock(session, lock_data)
 
     def config_category(self, session, name, config_op, config_val):
         category = self.find_category(session, name)
-        if not (category.access(session, 'control') or self.access(session, 'control')):
-            raise ValueError("Permission denied.")
         return category.config(session, config_op, config_val)
 
     def create_channel(self, session, category, name):

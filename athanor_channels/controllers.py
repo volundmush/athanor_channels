@@ -33,6 +33,7 @@ class AthanorChannelController(AthanorController):
     def create_system(self, sys_key, system_typeclass, category_typeclass, channel_typeclass, command_class):
         sys_typeclass = class_from_module(system_typeclass)
         new_system = sys_typeclass.create_channel_system(sys_key, category_typeclass, channel_typeclass, command_class)
+        return new_system
 
     def find_system(self, sys_key):
         if isinstance(sys_key, ChannelSystemBridge):
