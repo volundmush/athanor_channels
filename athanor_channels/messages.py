@@ -15,6 +15,36 @@ class ChannelCategoryMessage(SubMessage):
         pass
 
 
+class CreateCategory(ChannelCategoryMessage):
+    source_message = "Successfully created Channel Category: {target_fullname}"
+    target_message = ""
+    admin_message = "|w{source_name}|n created Channel Category: {target_fullname}"
+
+
+class RenameCategory(ChannelCategoryMessage):
+    source_message = "Successfully renamed Channel Category: {old_name} to {target_fullname}"
+    target_message = ""
+    admin_message = "|w{source_name}|n created Channel Category: {old_name} to {target_fullname}"
+
+
+class DeleteCategory(ChannelCategoryMessage):
+    source_message = "Successfully |rDELETED|n Channel Category: {target_fullname}"
+    target_message = ""
+    admin_message = "|w{source_name}|n |rDELETED|n Channel Category: {target_fullname}"
+
+
+class LockCategory(ChannelCategoryMessage):
+    source_message = "Successfully locked Channel Category: {target_fullname} to: {lock_string}"
+    target_message = ""
+    admin_message = "|w{source_name}|n created Channel Category: {target_fullname} to: {lock_string}"
+
+
+class ConfigCategory(ChannelCategoryMessage):
+    source_message = "Successfully re-configured Channel Category: {target_fullname}. Set {config_op} to: {config_val}}"
+    target_message = ""
+    admin_message = "|w{source_name}|n created Channel Category: {target_fullname} to: {lock_string}"
+
+
 class ChannelMessage(SubMessage):
     system_name = "CHANNEL"
 
@@ -22,13 +52,31 @@ class ChannelMessage(SubMessage):
         pass
 
 
-class CreateMessage(ChannelMessage):
-    source_message = ""
+class CreateChannel(ChannelMessage):
+    source_message = "Successfully created Channel: {target_fullname}"
     target_message = ""
-    admin_message = "|w{source_name}|n created Account: |w{target_name}|n"
+    admin_message = "|w{source_name}|n created Channel: {target_fullname}"
 
 
-class RenameMessage(ChannelMessage):
-    source_message = "Successfully renamed Account: |w{old_name}|n to |w{target_name}"
-    target_message = "|w{source_name}|n renamed your Account from |w{old_name}|n to |w{target_name}"
-    admin_message = "|w{source_name}|n renamed Account |w{old_name}|n to |w{target_name}"
+class RenameChannel(ChannelMessage):
+    source_message = "Successfully renamed Channel: {old_name} to {target_fullname}"
+    target_message = "|w{source_name}|n created Channel: {old_name} to {target_fullname}"
+    admin_message = "|w{source_name}|n created Channel: {old_name} to {target_fullname}"
+
+
+class DeleteChannel(ChannelMessage):
+    source_message = "Successfully |rDELETED|n Channel: {target_fullname}"
+    target_message = "|w{source_name}|n |rDELETED|n Channel: {target_fullname}"
+    admin_message = "|w{source_name}|n |rDELETED|n Channel: {target_fullname}"
+
+
+class LockChannel(ChannelMessage):
+    source_message = "Successfully locked Channel: {target_fullname} to: {lock_string}"
+    target_message = "|w{source_name}|n created Channel: {target_fullname} to: {lock_string}"
+    admin_message = "|w{source_name}|n created Channel: {target_fullname} to: {lock_string}"
+
+
+class ConfigChannel(ChannelCategoryMessage):
+    source_message = "Successfully re-configured Channel: {target_fullname}. Set {config_op} to: {config_val}}"
+    target_message = "|w{source_name}|n created Channel: {target_fullname} to: {lock_string}"
+    admin_message = "|w{source_name}|n created Channel: {target_fullname} to: {lock_string}"

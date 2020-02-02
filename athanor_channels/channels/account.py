@@ -1,7 +1,14 @@
 from athanor_channels.channels.base import AbstractChannel, AbstractChannelCategory, AbstractChannelSystem
+import athanor
 
 
-class AccountChannel(AbstractChannel):
+class HasAccountUser(object):
+
+    def find_user(self, session, user):
+        return athanor.CONTROLLER_MANAGER.get('account').find_account(user)
+
+
+class AccountChannel(HasAccountUser, AbstractChannel):
 
     def get_sender(self, sending_session=None):
         if not sending_session:
@@ -13,9 +20,9 @@ class AccountChannel(AbstractChannel):
         return self.account_subscriptions
 
 
-class AccountChannelCategory(AbstractChannelCategory):
+class AccountChannelCategory(HasAccountUser, AbstractChannelCategory):
     pass
 
 
-class AccountChannelSystem(AbstractChannelSystem):
+class AccountChannelSystem(HasAccountUser, AbstractChannelSystem):
     pass

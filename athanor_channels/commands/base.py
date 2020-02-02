@@ -1,5 +1,6 @@
 import re
 
+from evennia.utils.utils import lazy_property
 
 from athanor.commands.command import AthanorCommand
 from athanor.utils.text import Speech
@@ -47,10 +48,42 @@ class HasDisplayList(HasChannelSystem):
             return self.display_channel_list()
         return self.display_channel_info()
 
+_CHANNEL_DOC = """
+This command was created as an alias to a {system_key} Channel.
+
+Usage:
+    {key} <text>
+        Send text to a channel.
+    
+    {key}/who
+        Display other users on the channel.
+    
+    {key}/leave
+        Leave the channel. This command will be removed.
+    
+    {key}/title <title>
+        Set a title-prefix that will appear before your names.
+    
+    {key}/altname <alternate name>
+        Change the name you see this channel's messages under.
+    
+    {key}/off
+        Stop receiving messages until you /on. Clears on a logoff/login.
+    
+    {key}/codename <code name>
+        An alternate name you will appear as, on supported channels.
+
+    Set /title, /altname, or /codename to None to clear them.
+"""
+
 
 class AbstractChannelCommand(HasChannelSystem, AthanorCommand):
     switch_options = ('who', 'leave', 'title', 'altname', 'mute', 'unmute', 'on', 'off')
     controller = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__doc__ = _CHANNEL_DOC.format(key=self.key, system_key=self.system_key)
 
     def switch_main(self):
         subscrip = self.subscription
@@ -88,11 +121,55 @@ class AbstractChannelCommand(HasChannelSystem, AthanorCommand):
         self.caller.channels.who(self.subscription)
 
 
-class AbstractChannelAdminCommand(HasDisplayList):
-    """
+_ADMIN_DOC = """
+This command is for administrating the {system_key} Channel System.
 
-    """
+Note: For below, <target> is either a <category> or a <category>/<channel>
+
+Usage:
+    {key}
+        List all channels in the System by Category.
+    
+    {key}/create <target>[=<description>]
+        Creates a Category or a Channel in a Category. Optionally gives it a
+        description.
+    
+    {key}/rename <target>[=<new name>]
+        Renames the targeted category[/channel]. and optionally sets a
+        description.
+    
+    {key}/lock <target>=<lock string>
+        Sets an Evennia lock string to the category[/channel].
+        Please don't screw with this if you don't know what you're doing.
+    
+    {key}/grant <target>=<position>,<user1>[,<user2>,<user3>,<user4>,...]
+        Grants one or more users <position> over target.
+        <position> can be moderator or operator. Explained further down.
+        if <target> is /, it grants the position to all categories.
+        Use {key}/revoke with the same syntax to revoke positions.
+    
+    {key}/ban <target>=<user>
+        Prevent a specific person from using this channel.
+
+Concepts:
+    Moderators: Moderators can use disciplinary commands on users.
+    Operators: Operators can alter configurations and create/delete 
+        resources such as channels.
+        Operators also possess all Moderator powers.
+    Hierarchy: The Channel System is arranged as 
+        System -> Category -> Channel.
+        If you are a <position> in a parent entity, you inherit this 
+        position on all child entities. IE: If you have Operator status
+        on a Category, you have power over all channels in that category.
+"""
+
+
+class AbstractChannelAdminCommand(HasDisplayList):
     switch_options = ('create', 'rename', 'lock', 'config', 'grant', 'revoke', 'ban')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__doc__ = _ADMIN_DOC.format(system_key=self.system_key, key=self.key)
 
     def switch_create(self):
         err = f"Usage: {self.key}/create <CategoryName> OR {self.key}/create <Category>/<ChannelName>"
@@ -154,7 +231,7 @@ class AbstractChannelAdminCommand(HasDisplayList):
         target = self.target_channel(self.lhs)
         if not len(self.rhslist) > 2:
             raise ValueError(err)
-        subjects = self.user_parselist(self.rhslist)
+        subjects = self.user_parselist(self.rhslist[1:])
         if len(target) == 1:
             self.controllers.get('channel').grant_system(self.session, target[0], subjects)
         if len(target) == 2:
@@ -168,7 +245,7 @@ class AbstractChannelAdminCommand(HasDisplayList):
         target = self.target_channel(self.lhs)
         if not len(self.rhslist) > 2:
             raise ValueError(err)
-        subjects = self.user_parselist(self.rhslist)
+        subjects = self.user_parselist(self.rhslist[1:])
         if len(target) == 1:
             self.controllers.get('channel').revoke_system(self.session, target[0], subjects)
         if len(target) == 2:

@@ -7,6 +7,7 @@ class AccountChannelCommand(AbstractChannelCommand):
     help_category = "Account Channel Aliases"
     controller = 'account'
 
+
 class CmdAccountChannelAdmin(AbstractChannelAdminCommand):
     account_caller = True
     system_key = 'account'

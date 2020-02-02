@@ -1,5 +1,8 @@
 from django.db.models import Q
+
 from athanor.cmdsets.base import AthanorCmdSet
+from athanor.utils.text import partial_match
+from athanor_channels.models import AbstractChannelSubscription
 
 
 class AbstractChannelHandler(object):
@@ -43,7 +46,10 @@ class AbstractChannelHandler(object):
         self.update_cache()
 
     def find_alias(self, alias):
-        if not (found := self.subscriptions.filter(db_namespace=self.namespace, db_name=alias).first()):
+        if isinstance(alias, AbstractChannelSubscription):
+            return alias
+        aliases = self.subscriptions.filter(db_namespace=self.namespace)
+        if not (found := partial_match(alias, aliases)):
             raise ValueError(f"Channel Alias not found: {alias}!")
         return found
 
@@ -54,6 +60,14 @@ class AbstractChannelHandler(object):
 
     def codename(self, alias, codename):
         found = self.find_alias(alias)
+        if not codename:
+            raise ValueError("Must include a codename!")
+        if codename.lower() == 'none':
+            found.db_ccodename = None
+            found.db_codename = None
+            found.db_icodename = None
+        others = getattr(found.db_channel, f"{self.namespace}_subscriptions")
+
 
     def title(self, alias, title):
         found = self.find_alias(alias)
