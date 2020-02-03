@@ -1,82 +1,62 @@
-from athanor.utils.submessage import SubMessage
+from athanor.utils.message import AdminMessage
 
 
-class ChannelSystemMessage(SubMessage):
+class ChannelMessage(AdminMessage):
     system_name = "CHANNEL"
-
-    def send_target(self):
-        pass
+    targets = ['enactor', 'target', 'user', 'admin']
 
 
-class ChannelCategoryMessage(SubMessage):
-    system_name = "CHANNEL"
-
-    def send_target(self):
-        pass
-
-
-class CreateCategory(ChannelCategoryMessage):
-    source_message = "Successfully created Channel Category: {target_fullname}"
-    target_message = ""
-    admin_message = "|w{source_name}|n created Channel Category: {target_fullname}"
+class Create(ChannelMessage):
+    messages = {
+        'enactor': "Successfully created {target_typename}: {target_fullname}",
+        'target': "|w{enactor_name}|n created {target_typename}: {target_fullname}",
+        'admin': "|w{enactor_name}|n created {target_typename}: {target_fullname}"
+    }
 
 
-class RenameCategory(ChannelCategoryMessage):
-    source_message = "Successfully renamed Channel Category: {old_name} to {target_fullname}"
-    target_message = ""
-    admin_message = "|w{source_name}|n created Channel Category: {old_name} to {target_fullname}"
+class Rename(ChannelMessage):
+    messages = {
+        'enactor': "Successfully renamed {target_typename}: {old_name} to {target_fullname}",
+        'target': "|w{enactor_name}|n renamed {target_typename}: {old_name} to {target_fullname}",
+        'admin': "|w{enactor_name}|n renamed {target_typename}: {old_name} to {target_fullname}"
+    }
 
 
-class DeleteCategory(ChannelCategoryMessage):
-    source_message = "Successfully |rDELETED|n Channel Category: {target_fullname}"
-    target_message = ""
-    admin_message = "|w{source_name}|n |rDELETED|n Channel Category: {target_fullname}"
+class Delete(ChannelMessage):
+    messages = {
+        'enactor': "Successfully |rDELETED|n {target_typename}: {target_fullname}",
+        'target': "|w{enactor_name}|n |rDELETED|n {target_typename}: {target_fullname}",
+        'admin': "|w{enactor_name}|n |rDELETED|n {target_typename}: {target_fullname}"
+    }
 
 
-class LockCategory(ChannelCategoryMessage):
-    source_message = "Successfully locked Channel Category: {target_fullname} to: {lock_string}"
-    target_message = ""
-    admin_message = "|w{source_name}|n created Channel Category: {target_fullname} to: {lock_string}"
+class Lock(ChannelMessage):
+    messages = {
+        'enactor': "Successfully locked {target_typename}: {target_fullname} to: {lock_string}",
+        'target': "|w{enactor_name}|n locked {target_typename}: {target_fullname} to: {lock_string}",
+        'admin': "|w{enactor_name}|n locked {target_typename}: {target_fullname} to: {lock_string}"
+    }
 
 
-class ConfigCategory(ChannelCategoryMessage):
-    source_message = "Successfully re-configured Channel Category: {target_fullname}. Set {config_op} to: {config_val}}"
-    target_message = ""
-    admin_message = "|w{source_name}|n created Channel Category: {target_fullname} to: {lock_string}"
+class Config(ChannelMessage):
+    messages = {
+        'enactor': "Successfully re-configured {target_typename}: {target_fullname}. Set {config_op} to: {config_val}}",
+        'target': "|w{enactor_name}|n re-configured {target_typename}: {target_fullname}. Set {config_op} to: {config_val}}",
+        'admin': "|w{enactor_name}|n re-configured {target_typename}: {target_fullname}. Set {config_op} to: {config_val}}"
+    }
 
 
-class ChannelMessage(SubMessage):
-    system_name = "CHANNEL"
-
-    def send_target(self):
-        pass
+class Grant(ChannelMessage):
+    pass
 
 
-class CreateChannel(ChannelMessage):
-    source_message = "Successfully created Channel: {target_fullname}"
-    target_message = ""
-    admin_message = "|w{source_name}|n created Channel: {target_fullname}"
+class Revoke(ChannelMessage):
+    pass
 
 
-class RenameChannel(ChannelMessage):
-    source_message = "Successfully renamed Channel: {old_name} to {target_fullname}"
-    target_message = "|w{source_name}|n created Channel: {old_name} to {target_fullname}"
-    admin_message = "|w{source_name}|n created Channel: {old_name} to {target_fullname}"
+class Ban(ChannelMessage):
+    pass
 
 
-class DeleteChannel(ChannelMessage):
-    source_message = "Successfully |rDELETED|n Channel: {target_fullname}"
-    target_message = "|w{source_name}|n |rDELETED|n Channel: {target_fullname}"
-    admin_message = "|w{source_name}|n |rDELETED|n Channel: {target_fullname}"
-
-
-class LockChannel(ChannelMessage):
-    source_message = "Successfully locked Channel: {target_fullname} to: {lock_string}"
-    target_message = "|w{source_name}|n created Channel: {target_fullname} to: {lock_string}"
-    admin_message = "|w{source_name}|n created Channel: {target_fullname} to: {lock_string}"
-
-
-class ConfigChannel(ChannelCategoryMessage):
-    source_message = "Successfully re-configured Channel: {target_fullname}. Set {config_op} to: {config_val}}"
-    target_message = "|w{source_name}|n created Channel: {target_fullname} to: {lock_string}"
-    admin_message = "|w{source_name}|n created Channel: {target_fullname} to: {lock_string}"
+class Unban(ChannelMessage):
+    pass

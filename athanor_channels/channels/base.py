@@ -1,68 +1,36 @@
 import re
 from evennia.comms.comms import DefaultChannel
 from evennia.utils.ansi import ANSIString
-from evennia.utils.utils import lazy_property
-from evennia.utils.utils import class_from_module
+from evennia.utils.utils import lazy_property, class_from_module
 from evennia.utils.logger import log_trace
 
 from athanor.gamedb.scripts import AthanorOptionScript
 from athanor.utils.text import partial_match
-from athanor.utils.mixins import HasAttributeGetCreate
+from athanor.gamedb.base import HasRenderExamine, HasOps
 
 from athanor_channels.models import ChannelSystemBridge, ChannelCategoryBridge, ChannelBridge
 from athanor_channels import messages as cmsg
 from athanor_channels.commands.base import AbstractChannelCommand
 
 
-class HasChanOps(HasAttributeGetCreate):
+class HasChanOps(HasOps, HasRenderExamine):
     """
     Limited Mixin for providing some permissions storage to the Channel System.
     """
+    grant_msg = cmsg.Grant
+    revoke_msg = cmsg.Revoke
+    ban_msg = cmsg.Ban
+    unban_msg = cmsg.Unban
+    lock_msg = cmsg.Lock
+    config_msg = cmsg.Config
 
-    @lazy_property
-    def operators(self):
-        return self.get_or_create_attribute('operators', default=set())
+    def render_examine(self, viewer, callback=True):
+        return self.render_examine_callback(None, viewer, callback=callback)
 
-    @lazy_property
-    def moderators(self):
-        return self.get_or_create_attribute('moderators', default=set())
-
-    def add_moderator(self, session, user):
-        if not (enactor := session.get_account()) or not (enactor.check_lock(f"oper({self.operate_operation})")
-                                                          or self.is_operator(session)):
+    def examine(self, session):
+        if not (enactor := self.get_user(session)) or not self.is_operator(enactor):
             raise ValueError("Permission denied.")
-        user = self.find_user(session, user)
-        if user not in self.moderators:
-            raise ValueError(f"{user} is already a moderator!")
-        self.moderators.add(user)
-        cmsg.AppointModerator(source=enactor, target=self, user_name=str(user)).send()
-
-    def remove_moderator(self, session, user):
-        if not (enactor := session.get_account()) or not (enactor.check_lock(f"oper({self.operate_operation})")
-                                                          or self.is_operator(session)):
-            raise ValueError("Permission denied.")
-        user = self.find_user(session, user)
-        if user not in self.moderators:
-            raise ValueError(f"{user} is not a moderator!")
-        self.moderators.add(user)
-        cmsg.RevokeModerator(source=enactor, target=self, user_name=str(user)).send()
-
-    def do_add_operator(self, session, enactor, user):
-        user = self.find_user(session, user)
-        if user not in self.operators:
-            raise ValueError(f"{user} is already an operator!")
-        self.operators.add(user)
-        cmsg.GrantOperator(source=enactor, target=self, user_name=str(user)).send()
-
-    def do_remove_operator(self, session, enactor, user):
-        user = self.find_user(session, user)
-        if user in self.operators:
-            raise ValueError(f"{user} is not an operator!")
-        self.operators.remove(user)
-        cmsg.RevokeOperator(source=enactor, target=self, user_name=str(user)).send()
-
-    def find_user(self, session, user):
-        pass
+        return self.render_examine(enactor, callback=False)
 
 
 class AbstractChannel(DefaultChannel, HasChanOps):
@@ -72,27 +40,22 @@ class AbstractChannel(DefaultChannel, HasChanOps):
     re_name = re.compile(r"(?i)^([A-Z]|[0-9]|\.|-|')+( ([A-Z]|[0-9]|\.|-|')+)*$")
     operate_operation = "channel_operate"
     moderate_operation = "channel_moderate"
+    use_operation = 'channel_use'
+    examine_type = 'channel'
+
+    @property
+    def cname(self):
+        return self.bridge.cname
 
     @property
     def fullname(self):
-        return f"{self.system}/{self.category}/{self}"
+        return f"{self.system}/{self.category.cname}/{self.cname}"
 
     def generate_substitutions(self, viewer):
         return {"name": self.key,
                 "cname": self.bridge.cname,
-                "fullname": self.fullname}
-
-    def add_operator(self, session, user):
-        if not (enactor := session.get_account()) or not (enactor.check_lock(f"oper({self.operate_operation})")
-                                                          or self.category.is_operator(session)):
-            raise ValueError("Permission denied.")
-        self.do_add_operator(session, enactor, user)
-
-    def remove_operator(self, session, user):
-        if not (enactor := session.get_account()) or not (enactor.check_lock(f"oper({self.operate_operation})")
-                                                          or self.category.is_operator(session)):
-            raise ValueError("Permission denied.")
-        self.do_remove_operator(session, enactor, user)
+                "fullname": self.fullname,
+                'typename': 'Channel'}
 
     @property
     def bridge(self):
@@ -105,6 +68,10 @@ class AbstractChannel(DefaultChannel, HasChanOps):
     @property
     def system(self):
         return self.category.system
+
+    @property
+    def parent(self):
+        return self.category
 
     @lazy_property
     def listeners(self):
@@ -154,7 +121,7 @@ class AbstractChannel(DefaultChannel, HasChanOps):
             key (ANSIString): The successful key set.
         """
         key = ANSIString(key)
-        clean_key = str(key.clean())
+        clean_key = key.clean()
         if '|' in clean_key:
             raise ValueError("Malformed ANSI in Channel Name.")
         if not self.re_name.match(clean_key):
@@ -165,17 +132,9 @@ class AbstractChannel(DefaultChannel, HasChanOps):
         self.key = clean_key
         bridge.db_name = clean_key
         bridge.db_iname = clean_key.lower()
-        bridge.db_cname = key
+        bridge.db_cname = key.raw()
         bridge.save(update_fields=['db_name', 'db_iname', 'db_cname'])
         return key
-
-    def is_operator(self, session):
-        enactor = session.get_puppet_or_account()
-        return enactor in self.operators or self.access(session, 'control') or self.category.is_operator(session)
-
-    def is_moderator(self, session):
-        enactor = session.get_puppet_or_account()
-        return enactor in self.moderators or self.access(session, 'moderate') or self.category.is_moderator(session)
 
     def __str__(self):
         return str(self.key)
@@ -186,7 +145,7 @@ class AbstractChannel(DefaultChannel, HasChanOps):
         return sending_session.get_puppet_or_account()
 
     def render_prefix(self, recipient, sender):
-        return f"<{self.key}>"
+        return f"<{self.bridge.cname}>"
 
     def broadcast(self, text, sending_session=None):
         sender = self.get_sender(sending_session)
@@ -197,47 +156,29 @@ class AbstractChannel(DefaultChannel, HasChanOps):
     def check_access(self, checker, lock):
         return self.access(checker, lock) or self.category.access(checker, lock)
 
-    def lock(self, session, lock_data):
-        if not (enactor := session.get_account()) or not (enactor.check_lock("oper(channel_lock)")
-                                                          or self.check_access(enactor, 'control')):
-            raise ValueError("Permission denied.")
-        self.locks.add(lock_data)
-        cmsg.LockChannelMessage(source=enactor, target=self, lock_string=lock_data).send()
-
-    def config(self, session, config_op, config_val):
-        if not (enactor := session.get_account()) or not (enactor.check_lock("oper(channel_config)")
-                                                          or self.check_access(enactor, 'control')):
-            raise ValueError("Permission denied.")
-
 
 class AbstractChannelCategory(AthanorOptionScript, HasChanOps):
     re_name = re.compile(r"(?i)^([A-Z]|[0-9]|\.|-|')+( ([A-Z]|[0-9]|\.|-|')+)*$")
     operate_operation = "channel_category_operate"
     moderate_operation = "channel_category_moderate"
+    use_operation = 'channel_category_use'
+
+    @property
+    def cname(self):
+        return self.bridge.cname
 
     @property
     def fullname(self):
-        return f"{self.system}/{self}"
+        return f"{self.system}/{self.bridge.cname}"
 
     def generate_substitutions(self, viewer):
         return {"name": str(self),
                 "cname": self.bridge.cname,
-                "fullname": self.fullname}
+                "fullname": self.fullname,
+                'typename': 'Channel Category'}
 
     def __str__(self):
         return str(self.key)
-
-    def add_operator(self, session, user):
-        if not (enactor := session.get_account()) or not (enactor.check_lock(f"oper({self.operate_operation})")
-                                                          or self.system.is_operator(session)):
-            raise ValueError("Permission denied.")
-        self.do_add_operator(session, enactor, user)
-
-    def remove_operator(self, session, user):
-        if not (enactor := session.get_account()) or not (enactor.check_lock(f"oper({self.operate_operation})")
-                                                          or self.system.is_operator(session)):
-            raise ValueError("Permission denied.")
-        self.do_remove_operator(session, enactor, user)
 
     @property
     def bridge(self):
@@ -246,6 +187,10 @@ class AbstractChannelCategory(AthanorOptionScript, HasChanOps):
     @property
     def system(self):
         return self.bridge.db_system.db_script
+
+    @property
+    def parent(self):
+        return self.system
 
     def create_bridge(self, chan_sys, name, clean_name, unique_key=None):
         if hasattr(self, 'channel_category_bridge'):
@@ -292,7 +237,7 @@ class AbstractChannelCategory(AthanorOptionScript, HasChanOps):
         self.key = clean_key
         bridge.db_name = clean_key
         bridge.db_iname = clean_key.lower()
-        bridge.db_cname = key
+        bridge.db_cname = key.raw()
         bridge.save(update_fields=['db_name', 'db_iname', 'db_cname'])
         return key
 
@@ -314,41 +259,33 @@ class AbstractChannelCategory(AthanorOptionScript, HasChanOps):
     def check_access(self, checker, lock):
         return self.access(checker, lock) or self.system.access(checker, lock)
 
-    def is_operator(self, session):
-        enactor = session.get_puppet_or_account()
-        return enactor in self.operators or self.access(session, 'control') or self.system.is_operator(session)
-
-    def is_moderator(self, session):
-        enactor = session.get_puppet_or_account()
-        return enactor in self.moderators or self.access(session, 'moderate') or self.system.is_moderator(session)
-
     def create_channel(self, session, name):
-        if not (enactor := session.get_account()) or not (enactor.check_lock("oper(channel_create)")
-                                                          or self.check_access(enactor, 'control')):
+        if not (enactor := self.get_user(session)) or not self.is_operator(enactor):
             raise ValueError("Permission denied.")
         new_channel = self.system.ndb.channel_typeclass.create_channel(self, name)
-        cmsg.CreateChannel(source=enactor, target=new_channel).send()
+        entities = {'enactor': enactor, 'target': new_channel}
+        cmsg.Create(entities).send()
         return new_channel
 
     def rename_channel(self, session, name, new_name):
         channel = self.find_channel(session, name)
-        if not (enactor := session.get_account()) or not (enactor.check_lock("oper(channel_rename)")
-                                                          or self.check_access(enactor, 'control')):
+        if not (enactor := self.get_user(session)) or not self.is_operator(enactor):
             raise ValueError("Permission denied.")
-        if not self.is_operator(session):
+        if not self.is_operator(enactor):
             raise ValueError("Permission denied.")
         old_name = channel.fullname
         changed_name = channel.rename(new_name)
-        cmsg.RenameChannel(source=enactor, target=channel, old_name=old_name).send()
+        entities = {'enactor': enactor, 'target': channel}
+        cmsg.Rename(entities, old_name=old_name).send()
 
     def delete_channel(self, session, name, verify_name):
         channel = self.find_channel(session, name)
-        if not (enactor := session.get_account()) or not (enactor.check_lock("oper(channel_rename)")
-                                                          or self.check_access(enactor, 'control')):
+        if not (enactor := self.get_user(session)) or not self.is_operator(enactor):
             raise ValueError("Permission denied.")
         if not verify_name and verify_name.lower() == str(channel).lower():
             raise ValueError("Verify value does not match channel name!")
-        cmsg.DeleteChannel(source=enactor, target=channel).send()
+        entities = {'enactor': enactor, 'target': channel}
+        cmsg.Delete(entities).send()
         channel.delete()
 
     def lock_channel(self, session, name, lock_data):
@@ -359,37 +296,40 @@ class AbstractChannelCategory(AthanorOptionScript, HasChanOps):
         channel = self.find_channel(session, name)
         return channel.config(session, config_op, config_val)
 
-    def lock(self, session, lock_data):
-        if not (enactor := session.get_account()) or not (enactor.check_lock("oper(channel_category_lock)")
-                                                          or self.check_access(enactor, 'control')):
-            raise ValueError("Permission denied.")
-        self.locks.add(lock_data)
-        cmsg.LockCategory(source=enactor, target=self, lock_string=lock_data).send()
+    def grant_channel(self, session, name, position, user):
+        channel = self.find_channel(session, name)
+        return channel.grant(session, position, user)
 
-    def config(self, session, config_op, config_val):
-        if not (enactor := session.get_account()) or not (enactor.check_lock("oper(channel_category_config)")
-                                                          or self.check_access(enactor, 'control')):
-            raise ValueError("Permission denied.")
-        cmsg.ConfigCategory(source=enactor, target=self, config_op=config_op, config_val=config_val)
+    def revoke_channel(self, session, name, position, user):
+        channel = self.find_channel(session, name)
+        return channel.revoke(session, position, user)
+
+    def ban_channel(self, session, name, user, duration):
+        channel = self.find_channel(session, name)
+        return channel.ban_channel(session, user, duration)
+
+    def unban_channel(self, session, name, user):
+        channel = self.find_channel(session, name)
+        return channel.unban(session, user)
+
+    def who_channel(self, session, name):
+        channel = self.find_channel(session, name)
+        return channel.who(session)
+
+    def examine_channel(self, session, name):
+        channel = self.find_channel(session, name)
+        return channel.examine(session)
 
 
 class AbstractChannelSystem(AthanorOptionScript, HasChanOps):
     operate_operation = "channel_system_operate"
     moderate_operation = "channel_system_moderate"
+    use_operation = 'channel_system_use'
 
     def generate_substitutions(self, viewer):
         return {"name": str(self),
-                "fullname": str(self)}
-
-    def add_operator(self, session, user):
-        if not (enactor := session.get_account()) or not enactor.check_lock(f"oper({self.operate_operation})"):
-            raise ValueError("Permission denied.")
-        self.do_add_operator(session, enactor, user)
-
-    def remove_operator(self, session, user):
-        if not (enactor := session.get_account()) or not enactor.check_lock(f"oper({self.operate_operation})"):
-            raise ValueError("Permission denied.")
-        self.do_remove_operator(session, enactor, user)
+                "fullname": str(self),
+                'typename': 'Channel System'}
 
     def __str__(self):
         return str(self.key)
@@ -435,6 +375,12 @@ class AbstractChannelSystem(AthanorOptionScript, HasChanOps):
         ChannelSystemBridge.objects.create(db_script=self, db_command_class=command_class, db_system_key=sys_key,
                                            db_category_typeclass=category_typeclass,
                                            db_channel_typeclass=channel_typeclass)
+
+    def parent_operator(self, user):
+        return user.check_lock(f"oper({self.operate_operation})")
+
+    def parent_moderator(self, user):
+        return user.check_lock(f"oper({self.operate_operation})")
 
     @classmethod
     def create_channel_system(cls, name, category_typeclass, channel_typeclass, command_class):
@@ -485,44 +431,37 @@ class AbstractChannelSystem(AthanorOptionScript, HasChanOps):
             return found
         raise ValueError(f"Cannot find Channel Category: {name}")
 
-    def is_operator(self, session):
-        enactor = session.get_puppet_or_account()
-        account = session.get_account()
-        return account.check_lock(f"oper({self.operate_operation})") or enactor in self.operators
-
-    def is_moderator(self, session):
-        enactor = session.get_puppet_or_account()
-        account = session.get_account()
-        return account.check_lock(f"oper({self.moderate_operation})") or enactor in self.moderators
-
     def create_category(self, session, name):
-        if not (enactor := session.get_account()) or not self.is_operator(session):
+        if not (enactor := self.get_user(session)) or not self.is_operator(enactor):
             raise ValueError("Permission denied.")
         new_category = self.ndb.category_typeclass.create_channel_category(self, name)
-        cmsg.CreateCategory(source=enactor, target=new_category).send()
+        entities = {'enactor': enactor, 'target': new_category}
+        cmsg.Create(entities).send()
         return new_category
 
     def rename_category(self, session, name, new_name):
         category = self.find_category(session, name)
-        if not (enactor := session.get_account()) or not self.is_operator(session):
+        if not (enactor := self.get_user(session)) or not self.is_operator(enactor):
             raise ValueError("Permission denied.")
         old_name = category.fullname
         changed_name = category.rename(new_name)
-        cmsg.RenameCategory(source=enactor, target=category, old_name=old_name).send()
+        entities = {'enactor': enactor, 'target': category}
+        cmsg.Rename(entities, old_name=old_name).send()
         return changed_name
 
     def delete_category(self, session, name, verify_name):
         category = self.find_category(session, name)
-        if not (enactor := session.get_account()) or not self.is_operator(session):
+        if not (enactor := self.get_user(session)) or not self.is_operator(enactor):
             raise ValueError("Permission denied.")
         if not verify_name and not verify_name.lower() == str(category).lower():
             raise ValueError("Confirmation value must match Category name!")
-        cmsg.DeleteCategory(source=enactor, target=category).send()
+        entities = {'enactor': enactor, 'target': category}
+        cmsg.Delete(entities).send()
         category.delete()
 
     def lock_category(self, session, name, lock_data):
         category = self.find_category(session, name)
-        category.lock(session, lock_data)
+        return category.lock(session, lock_data)
 
     def config_category(self, session, name, config_op, config_val):
         category = self.find_category(session, name)
@@ -547,3 +486,47 @@ class AbstractChannelSystem(AthanorOptionScript, HasChanOps):
     def config_channel(self, session, category, name, config_op, config_val):
         category = self.find_category(session, category)
         return category.config_channel(session, name, config_op, config_val)
+
+    def grant_category(self, session, category, position, user):
+        category = self.find_category(session, category)
+        return category.grant_category(session, position, user)
+
+    def grant_channel(self, session, category, name, position, user):
+        category = self.find_category(session, category)
+        return category.grant_channel(session, name, position, user)
+
+    def revoke_category(self, session, category, position, user):
+        category = self.find_category(session, category)
+        return category.revoke_category(session, position, user)
+
+    def revoke_channel(self, session, category, name, position, user):
+        category = self.find_category(session, category)
+        return category.revoke_channel(session, name, position, user)
+
+    def ban_category(self, session, category, user, duration):
+        category = self.find_category(session, category)
+        return category.ban_category(session, user, duration)
+
+    def ban_channel(self, session, category, name, user, duration):
+        category = self.find_category(session, category)
+        return category.ban_channel(session, name, user, duration)
+
+    def unban_category(self, session, category, user):
+        category = self.find_category(session, category)
+        return category.unban_category(session, user)
+
+    def unban_channel(self, session, category, name, user):
+        category = self.find_category(session, category)
+        return category.unban_channel(session, name, user)
+
+    def who_channel(self, session, category, name):
+        category = self.find_category(session, category)
+        return category.who_channel(session, name)
+
+    def examine_category(self, session, category):
+        category = self.find_category(session, category)
+        return category.examine_category(session)
+
+    def examine_channel(self, session, category, name):
+        category = self.find_category(session, category)
+        return category.examine_channel(session, name)

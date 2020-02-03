@@ -7,6 +7,9 @@ class HasCharacterUser(object):
     def find_user(self, session, user):
         return athanor.CONTROLLER_MANAGER.get('character').find_character(user)
 
+    def get_user(self, session):
+        return session.get_puppet()
+
 
 class CharacterChannel(HasCharacterUser, AbstractChannel):
 

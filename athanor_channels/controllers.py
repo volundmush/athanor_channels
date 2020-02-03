@@ -83,3 +83,67 @@ class AthanorChannelController(AthanorController):
     def config_channel(self, session, sys_key, category, name, config_op, config_val):
         chan_sys = self.find_system(sys_key)
         return chan_sys.config_channel(session, category, name, config_op, config_val)
+
+    def grant_system(self, session, sys_key, position, subjects):
+        chan_sys = self.find_system(sys_key)
+        return chan_sys.grant(session, position, subjects)
+    
+    def grant_category(self, session, sys_key, name, position, subjects):
+        chan_sys = self.find_system(sys_key)
+        return chan_sys.grant_category(session, name, position, subjects)
+    
+    def grant_channel(self, session, sys_key, category, name, position, subjects):
+        chan_sys = self.find_system(sys_key)
+        return chan_sys.grant_channel(session, category, name, position, subjects)
+
+    def revoke_system(self, session, sys_key, position, subjects):
+        chan_sys = self.find_system(sys_key)
+        return chan_sys.revoke(session, position, subjects)
+
+    def revoke_category(self, session, sys_key, name, position, subjects):
+        chan_sys = self.find_system(sys_key)
+        return chan_sys.revoke_category(session, name, position, subjects)
+
+    def revoke_channel(self, session, sys_key, category, name, position, subjects):
+        chan_sys = self.find_system(sys_key)
+        return chan_sys.revoke_channel(session, category, name, position, subjects)
+
+    def ban_system(self, session, sys_key, user, duration):
+        chan_sys = self.find_system(sys_key)
+        return chan_sys.ban(session, user, duration)
+
+    def ban_category(self, session, sys_key, name, user, duration):
+        chan_sys = self.find_system(sys_key)
+        return chan_sys.ban_category(session, name, user, duration)
+
+    def ban_channel(self, session, sys_key, category, name, user, duration):
+        chan_sys = self.find_system(sys_key)
+        return chan_sys.ban_channel(session, category, name, user, duration)
+    
+    def unban_system(self, session, sys_key, user):
+        chan_sys = self.find_system(sys_key)
+        return chan_sys.unban(session, user)
+
+    def unban_category(self, session, sys_key, name, user):
+        chan_sys = self.find_system(sys_key)
+        return chan_sys.unban_category(session, name, user)
+
+    def unban_channel(self, session, sys_key, category, name, user):
+        chan_sys = self.find_system(sys_key)
+        return chan_sys.unban_channel(session, category, name, user)
+
+    def who_channel(self, session, sys_key, category, name):
+        chan_sys = self.find_system(sys_key)
+        return chan_sys.who_channel(session, category, name)
+
+    def examine_system(self, session, sys_key):
+        chan_sys = self.find_system(sys_key)
+        return chan_sys.examine(session)
+
+    def examine_category(self, session, sys_key, name):
+        chan_sys = self.find_system(sys_key)
+        return chan_sys.examine_category(session, name)
+
+    def examine_channel(self, session, sys_key, category, name):
+        chan_sys = self.find_system(sys_key)
+        return chan_sys.examine_channel(session, category, name)

@@ -7,6 +7,9 @@ class HasAccountUser(object):
     def find_user(self, session, user):
         return athanor.CONTROLLER_MANAGER.get('account').find_account(user)
 
+    def get_user(self, session):
+        return session.get_account()
+
 
 class AccountChannel(HasAccountUser, AbstractChannel):
 

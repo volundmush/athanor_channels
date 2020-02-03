@@ -1,5 +1,7 @@
 from django.db.models import Q
 
+from evennia.utils.ansi import ANSIString
+
 from athanor.cmdsets.base import AthanorCmdSet
 from athanor.utils.text import partial_match
 from athanor_channels.models import AbstractChannelSubscription
@@ -12,6 +14,9 @@ class AbstractChannelHandler(object):
         self._cached = False
         self._cached_cmdset = None
         self.update_cache()
+
+    def system_msg(self, message):
+        self.owner.msg(message, system_name=f"{self.namespace} Channels")
 
     def update_cache(self):
         cmdset = AthanorCmdSet()
@@ -66,14 +71,46 @@ class AbstractChannelHandler(object):
             found.db_ccodename = None
             found.db_codename = None
             found.db_icodename = None
-        others = getattr(found.db_channel, f"{self.namespace}_subscriptions")
-
+            found.save_codename()
+            self.system_msg("Codename cleared!")
+            return
+        codename = ANSIString(codename)
+        codename_clean = codename.clean()
+        if found.siblings.filter(db_icodename=codename_clean.lower()).count():
+            raise ValueError("This codename is already in use! No can do.")
+        found.db_ccodename = codename
+        found.db_codename = codename_clean
+        found.db_icodename = codename_clean.lower()
+        found.save_codename()
+        self.system_msg(f"Codename set to: {codename}")
 
     def title(self, alias, title):
         found = self.find_alias(alias)
+        if not title:
+            raise ValueError("Must include a title!")
+        if title.lower() == 'none':
+            found.db_altname = None
+            found.save(update_fields=['db_title'])
+            self.system_msg("Title cleared!")
+            return
+        title = ANSIString(title)
+        found.db_title = title
+        found.save(update_fields=['db_title'])
+        self.system_msg(f"Title set to: {title}")
 
     def altname(self, alias, altname):
         found = self.find_alias(alias)
+        if not altname:
+            raise ValueError("Must include an altname!")
+        if altname.lower() == 'none':
+            found.db_altname = None
+            found.save(update_fields=['db_altname'])
+            self.system_msg("Codename cleared!")
+            return
+        altname = ANSIString(altname)
+        found.db_altname = altname
+        found.save(update_fields=['db_altname'])
+        self.system_msg(f"Altname set to: {altname}")
 
     def check_listen(self, channel):
         all_aliases = self.subscriptions.filter(db_channel=channel)
@@ -88,23 +125,35 @@ class AbstractChannelHandler(object):
 
     def mute(self, alias):
         found = self.find_alias(alias)
+        if found.muted:
+            raise ValueError("Channel is already muted!")
         found.muted = True
         self.check_listen(found.db_channel)
+        self.system_msg("Muted the channel!")
 
     def unmute(self, alias):
         found = self.find_alias(alias)
+        if not found.muted:
+            raise ValueError("Channel is not muted!")
         found.muted = False
         self.check_listen(found.db_channel)
+        self.system_msg("un-Muted the channel!")
 
     def on(self, alias):
         found = self.find_alias(alias)
+        if found.enabled:
+            raise ValueError("Channel is already on!")
         found.enabled = True
         self.check_listen(found.db_channel)
+        self.system_msg("Turned channel on!")
 
     def off(self, alias):
         found = self.find_alias(alias)
+        if not found.enabled:
+            raise ValueError("Channel is not on!")
         found.enabled = False
         self.check_listen(found.db_channel)
+        self.system_msg("Turned channel on!")
 
 
 class AccountChannelHandler(AbstractChannelHandler):

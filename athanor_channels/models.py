@@ -56,6 +56,9 @@ class AbstractChannelSubscription(SharedMemoryModel):
     class Meta:
         abstract = True
 
+    def save_codename(self):
+        self.save(update_fields=['db_codename', 'db_ccodename', 'db_icodename'])
+
 
 class AccountChannelSubscription(AbstractChannelSubscription):
     db_account = models.ForeignKey('accounts.AccountDB', related_name='channel_subscriptions', on_delete=models.CASCADE)
@@ -65,11 +68,19 @@ class AccountChannelSubscription(AbstractChannelSubscription):
         unique_together = (('db_account', 'db_namespace', 'db_name'),
                            ('db_channel', 'db_icodename'))
 
+    @property
+    def siblings(self):
+        return self.db_channel.account_subscriptions.exclude(id=self.id)
 
-class ObjectChannelSubscription(AbstractChannelSubscription):
+
+class CharacterChannelSubscription(AbstractChannelSubscription):
     db_object = models.ForeignKey('objects.ObjectDB', related_name='channel_subscriptions', on_delete=models.CASCADE)
-    db_channel = models.ForeignKey('comms.ChannelDB', related_name='object_subscriptions', on_delete=models.CASCADE)
+    db_channel = models.ForeignKey('comms.ChannelDB', related_name='character_subscriptions', on_delete=models.CASCADE)
 
     class Meta:
         unique_together = (('db_object', 'db_namespace', 'db_name'),
                            ('db_channel', 'db_icodename'))
+
+    @property
+    def siblings(self):
+        return self.db_channel.character_subscriptions.exclude(id=self.id)
