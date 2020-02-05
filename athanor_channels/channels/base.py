@@ -33,7 +33,7 @@ class HasChanOps(HasOps, HasRenderExamine):
         return self.render_examine(enactor, callback=False)
 
 
-class AbstractChannel(DefaultChannel, HasChanOps):
+class AbstractChannel(HasChanOps, DefaultChannel):
     """
     Abstract class for Account and Object channels. Don't use this directly!
     """
@@ -157,7 +157,7 @@ class AbstractChannel(DefaultChannel, HasChanOps):
         return self.access(checker, lock) or self.category.access(checker, lock)
 
 
-class AbstractChannelCategory(AthanorOptionScript, HasChanOps):
+class AbstractChannelCategory(HasChanOps, AthanorOptionScript):
     re_name = re.compile(r"(?i)^([A-Z]|[0-9]|\.|-|')+( ([A-Z]|[0-9]|\.|-|')+)*$")
     operate_operation = "channel_category_operate"
     moderate_operation = "channel_category_moderate"
@@ -321,7 +321,7 @@ class AbstractChannelCategory(AthanorOptionScript, HasChanOps):
         return channel.examine(session)
 
 
-class AbstractChannelSystem(AthanorOptionScript, HasChanOps):
+class AbstractChannelSystem(HasChanOps, AthanorOptionScript):
     operate_operation = "channel_system_operate"
     moderate_operation = "channel_system_moderate"
     use_operation = 'channel_system_use'
