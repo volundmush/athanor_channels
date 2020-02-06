@@ -31,26 +31,12 @@ class HasChannelSystem(AthanorCommand):
 
 class HasDisplayList(HasChannelSystem):
 
-    def display_channel_list(self):
-        if not (categories := self.chan_sys.visible_categories(self.session)):
-            raise ValueError("No categories to display!")
-        styling = self.caller.styler
-        message = list()
-        message.append(styling.styled_header(f"{self.chan_sys} Channel Categories"))
-        for category in categories:
-            message.append(self.styled_separator(f"{category} Channels"))
-            for channel in category.visible_channels(self.session):
-                message.append(str(channel))
-        message.append(styling.blank_footer)
-        self.msg("\n".join(str(l) for l in message))
-
     def display_channel_info(self):
         self.msg(self.args)
-        print(self.args)
 
     def switch_main(self):
         if not self.args:
-            return self.display_channel_list()
+            return self.msg(self.chan_sys.render_channel_list(self.session))
         return self.display_channel_info()
 
 _CHANNEL_DOC = """

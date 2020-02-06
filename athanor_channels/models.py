@@ -59,6 +59,9 @@ class AbstractChannelSubscription(SharedMemoryModel):
     def save_codename(self):
         self.save(update_fields=['db_codename', 'db_ccodename', 'db_icodename'])
 
+    def print_status(self):
+        return 'Mut' if self.db_muted else 'On'
+
 
 class AccountChannelSubscription(AbstractChannelSubscription):
     db_account = models.ForeignKey('accounts.AccountDB', related_name='channel_subscriptions', on_delete=models.CASCADE)

@@ -47,6 +47,10 @@ class AbstractChannel(HasChanOps, DefaultChannel):
     def cname(self):
         return self.bridge.cname
 
+    @lazy_property
+    def description(self):
+        return self.get_or_create_attribute(key='desc', default='')
+
     @property
     def fullname(self):
         return f"{self.system}/{self.category.cname}/{self.cname}"
@@ -382,6 +386,9 @@ class AbstractChannelSystem(HasChanOps, AthanorOptionScript):
     def parent_moderator(self, user):
         return user.check_lock(f"oper({self.operate_operation})")
 
+    def parent_user(self, user):
+        return user.check_lock(f"oper({self.use_operation})")
+
     @classmethod
     def create_channel_system(cls, name, category_typeclass, channel_typeclass, command_class):
         key = ANSIString(name)
@@ -530,3 +537,30 @@ class AbstractChannelSystem(HasChanOps, AthanorOptionScript):
     def examine_channel(self, session, category, name):
         category = self.find_category(session, category)
         return category.examine_channel(session, name)
+
+    def channels(self):
+        return AbstractChannel.objects.filter_family(channel_bridge__db_category__db_system__db_script=self).order_by('channel_bridge__db_category__db_name', 'db_key')
+
+    def visible_channels(self, user):
+        return [channel for channel in self.channels() if channel.is_user(user)]
+
+    def render_channel_list(self, session):
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        if not (channels := self.visible_channels(enactor)):
+            raise ValueError("No Channels to display!")
+        styling = enactor.styler
+        message = list()
+        message.append(styling.styled_header(f"{str(self).capitalize()} Channels"))
+        message.append(styling.styled_columns("Sts Name                 Users     Description"))
+        this_cat = None
+        subscriptions = enactor.channels.subscriptions.filter(db_channel__channel_bridge__db_category__db_system__db_script=self)
+        for channel in channels:
+            if this_cat != (this_cat := channel.category):
+                message.append(styling.styled_separator(f"{this_cat} Channels"))
+            sub = subscriptions.filter(db_channel=channel).first()
+            banned = channel.is_banned(enactor)
+            status = 'Ban' if banned else sub.print_status() if sub else 'Off'
+            message.append(f"{status:<3} {channel.cname[:20]:<21}{len(channel.listeners):0>3}/{channel.subscriptions.count():0>3} {channel.description[:43]}")
+        message.append(styling.blank_footer)
+        return "\n".join(str(l) for l in message)
