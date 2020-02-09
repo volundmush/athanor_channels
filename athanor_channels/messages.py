@@ -47,16 +47,32 @@ class Config(ChannelMessage):
 
 
 class Grant(ChannelMessage):
-    pass
+    messages = {
+        'enactor': "Successfully granted {user_name} the {status} Status on: {target_fullname}",
+        'target': "|w{enactor_name}|n granted {user_name} the {status} Status on this {target_typename}",
+        'admin': "|w{enactor_name}|n granted {user_name} the {status} Status on: {target_fullname}"
+    }
 
 
 class Revoke(ChannelMessage):
-    pass
+    messages = {
+        'enactor': "Successfully revoked {user_name}'s {status} Status on: {target_fullname}",
+        'target': "|w{enactor_name}|n revoked {user_name}'s {status} Status on this {target_typename}",
+        'admin': "|w{enactor_name}|n revoked {user_name}'s {status} Status on: {target_fullname}"
+    }
 
 
 class Ban(ChannelMessage):
-    pass
+    messages = {
+        'enactor': "Successfully banned {user_name}'s from: {target_fullname} for: {duration_style_2}",
+        'target': "|w{enactor_name}|n banned {user_name} from this {target_typename} for {duration_style_2}",
+        'admin': "|w{enactor_name}|n banned {user_name}'s from: {target_fullname} for: {duration_style_2}",
+    }
 
 
 class Unban(ChannelMessage):
-    pass
+    messages = {
+        'enactor': "Successfully lifted {user_name}'s ban from: {target_fullname}",
+        'target': "|w{enactor_name}|n lifted {user_name} ban from this {target_typename}",
+        'admin': "|w{enactor_name}|n lifted {user_name}'s ban from: {target_fullname}",
+    }

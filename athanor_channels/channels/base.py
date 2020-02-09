@@ -42,6 +42,7 @@ class AbstractChannel(HasChanOps, DefaultChannel):
     moderate_operation = "channel_moderate"
     use_operation = 'channel_use'
     examine_type = 'channel'
+    dbtype = 'ChannelDB'
 
     @property
     def cname(self):
@@ -166,6 +167,7 @@ class AbstractChannelCategory(HasChanOps, AthanorOptionScript):
     operate_operation = "channel_category_operate"
     moderate_operation = "channel_category_moderate"
     use_operation = 'channel_category_use'
+    examine_type = 'channel_category'
 
     @property
     def cname(self):
@@ -251,12 +253,12 @@ class AbstractChannelCategory(HasChanOps, AthanorOptionScript):
     def visible_channels(self, session):
         return [channel for channel in self.channels() if channel.access(session, 'listen')]
 
-    def find_channel(self, session, name):
+    def find_channel(self, user, name):
         if isinstance(name, AbstractChannel):
             return name
         if isinstance(name, ChannelBridge):
             return name.db_channel
-        if (found := partial_match(name, self.visible_channels(session))):
+        if (found := partial_match(name, self.visible_channels(user))):
             return found
         raise ValueError(f"Cannot Find Channel: {name}")
 
@@ -272,9 +274,9 @@ class AbstractChannelCategory(HasChanOps, AthanorOptionScript):
         return new_channel
 
     def rename_channel(self, session, name, new_name):
-        channel = self.find_channel(session, name)
         if not (enactor := self.get_user(session)) or not self.is_operator(enactor):
             raise ValueError("Permission denied.")
+        channel = self.find_channel(enactor, name)
         if not self.is_operator(enactor):
             raise ValueError("Permission denied.")
         old_name = channel.fullname
@@ -283,9 +285,9 @@ class AbstractChannelCategory(HasChanOps, AthanorOptionScript):
         cmsg.Rename(entities, old_name=old_name).send()
 
     def delete_channel(self, session, name, verify_name):
-        channel = self.find_channel(session, name)
         if not (enactor := self.get_user(session)) or not self.is_operator(enactor):
             raise ValueError("Permission denied.")
+        channel = self.find_channel(enactor, name)
         if not verify_name and verify_name.lower() == str(channel).lower():
             raise ValueError("Verify value does not match channel name!")
         entities = {'enactor': enactor, 'target': channel}
@@ -293,35 +295,51 @@ class AbstractChannelCategory(HasChanOps, AthanorOptionScript):
         channel.delete()
 
     def lock_channel(self, session, name, lock_data):
-        channel = self.find_channel(session, name)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        channel = self.find_channel(enactor, name)
         return channel.lock(session, lock_data)
 
     def config_channel(self, session, name, config_op, config_val):
-        channel = self.find_channel(session, name)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        channel = self.find_channel(enactor, name)
         return channel.config(session, config_op, config_val)
 
     def grant_channel(self, session, name, position, user):
-        channel = self.find_channel(session, name)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        channel = self.find_channel(enactor, name)
         return channel.grant(session, position, user)
 
     def revoke_channel(self, session, name, position, user):
-        channel = self.find_channel(session, name)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        channel = self.find_channel(enactor, name)
         return channel.revoke(session, position, user)
 
     def ban_channel(self, session, name, user, duration):
-        channel = self.find_channel(session, name)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        channel = self.find_channel(enactor, name)
         return channel.ban_channel(session, user, duration)
 
     def unban_channel(self, session, name, user):
-        channel = self.find_channel(session, name)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        channel = self.find_channel(enactor, name)
         return channel.unban(session, user)
 
     def who_channel(self, session, name):
-        channel = self.find_channel(session, name)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        channel = self.find_channel(enactor, name)
         return channel.who(session)
 
     def examine_channel(self, session, name):
-        channel = self.find_channel(session, name)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        channel = self.find_channel(enactor, name)
         return channel.examine(session)
 
 
@@ -329,10 +347,11 @@ class AbstractChannelSystem(HasChanOps, AthanorOptionScript):
     operate_operation = "channel_system_operate"
     moderate_operation = "channel_system_moderate"
     use_operation = 'channel_system_use'
+    examine_type = 'channel_system'
 
     def generate_substitutions(self, viewer):
         return {"name": str(self),
-                "fullname": str(self),
+                "fullname": f"{self} Channel System",
                 'typename': 'Channel System'}
 
     def __str__(self):
@@ -429,12 +448,12 @@ class AbstractChannelSystem(HasChanOps, AthanorOptionScript):
     def visible_categories(self, checker):
         return [cat for cat in self.categories() if cat.access(checker, 'see') or True]
 
-    def find_category(self, session, name):
+    def find_category(self, user, name):
         if isinstance(name, AbstractChannelCategory):
             return name
         if isinstance(name, ChannelCategoryBridge):
             return name.db_script
-        if (found := partial_match(name, self.visible_categories(session))):
+        if (found := partial_match(name, self.visible_categories(user))):
             return found
         raise ValueError(f"Cannot find Channel Category: {name}")
 
@@ -447,9 +466,9 @@ class AbstractChannelSystem(HasChanOps, AthanorOptionScript):
         return new_category
 
     def rename_category(self, session, name, new_name):
-        category = self.find_category(session, name)
         if not (enactor := self.get_user(session)) or not self.is_operator(enactor):
             raise ValueError("Permission denied.")
+        category = self.find_category(enactor, name)
         old_name = category.fullname
         changed_name = category.rename(new_name)
         entities = {'enactor': enactor, 'target': category}
@@ -457,9 +476,9 @@ class AbstractChannelSystem(HasChanOps, AthanorOptionScript):
         return changed_name
 
     def delete_category(self, session, name, verify_name):
-        category = self.find_category(session, name)
         if not (enactor := self.get_user(session)) or not self.is_operator(enactor):
             raise ValueError("Permission denied.")
+        category = self.find_category(enactor, name)
         if not verify_name and not verify_name.lower() == str(category).lower():
             raise ValueError("Confirmation value must match Category name!")
         entities = {'enactor': enactor, 'target': category}
@@ -467,75 +486,112 @@ class AbstractChannelSystem(HasChanOps, AthanorOptionScript):
         category.delete()
 
     def lock_category(self, session, name, lock_data):
-        category = self.find_category(session, name)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        category = self.find_category(enactor, name)
         return category.lock(session, lock_data)
 
     def config_category(self, session, name, config_op, config_val):
-        category = self.find_category(session, name)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        category = self.find_category(enactor, name)
         return category.config(session, config_op, config_val)
 
     def create_channel(self, session, category, name):
-        category = self.find_category(session, category)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        category = self.find_category(enactor, category)
         return category.create_channel(session, name)
 
     def rename_channel(self, session, category, name, new_name):
-        category = self.find_category(session, category)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        category = self.find_category(enactor, category)
         return category.rename_channel(session, name, new_name)
 
     def delete_channel(self, session, category, name, verify_name):
-        category = self.find_category(session, category)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        category = self.find_category(enactor, category)
         return category.delete_channel(session, name, verify_name)
 
     def lock_channel(self, session, category, name, lock_data):
-        category = self.find_category(session, category)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        category = self.find_category(enactor, category)
         return category.lock_channel(session, name, lock_data)
 
     def config_channel(self, session, category, name, config_op, config_val):
-        category = self.find_category(session, category)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        category = self.find_category(enactor, category)
         return category.config_channel(session, name, config_op, config_val)
 
     def grant_category(self, session, category, position, user):
-        category = self.find_category(session, category)
-        return category.grant_category(session, position, user)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        category = self.find_category(enactor, category)
+        return category.grant(session, position, user)
 
     def grant_channel(self, session, category, name, position, user):
-        category = self.find_category(session, category)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        print(f"WHATS UP? {category} {type(category)}")
+        category = self.find_category(enactor, category)
         return category.grant_channel(session, name, position, user)
 
     def revoke_category(self, session, category, position, user):
-        category = self.find_category(session, category)
-        return category.revoke_category(session, position, user)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        category = self.find_category(enactor, category)
+        return category.revoke(session, position, user)
 
     def revoke_channel(self, session, category, name, position, user):
-        category = self.find_category(session, category)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        category = self.find_category(enactor, category)
         return category.revoke_channel(session, name, position, user)
 
     def ban_category(self, session, category, user, duration):
-        category = self.find_category(session, category)
-        return category.ban_category(session, user, duration)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        category = self.find_category(enactor, category)
+        return category.ban(session, user, duration)
 
     def ban_channel(self, session, category, name, user, duration):
-        category = self.find_category(session, category)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        category = self.find_category(enactor, category)
         return category.ban_channel(session, name, user, duration)
 
     def unban_category(self, session, category, user):
-        category = self.find_category(session, category)
-        return category.unban_category(session, user)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        category = self.find_category(enactor, category)
+        return category.unban(session, user)
 
     def unban_channel(self, session, category, name, user):
-        category = self.find_category(session, category)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        category = self.find_category(enactor, category)
         return category.unban_channel(session, name, user)
 
     def who_channel(self, session, category, name):
-        category = self.find_category(session, category)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        category = self.find_category(enactor, category)
         return category.who_channel(session, name)
 
     def examine_category(self, session, category):
-        category = self.find_category(session, category)
-        return category.examine_category(session)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        category = self.find_category(enactor, category)
+        return category.examine(session)
 
     def examine_channel(self, session, category, name):
-        category = self.find_category(session, category)
+        if not (enactor := self.get_user(session)):
+            raise ValueError("Permission denied.")
+        category = self.find_category(enactor, category)
         return category.examine_channel(session, name)
 
     def channels(self):

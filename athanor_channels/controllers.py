@@ -56,6 +56,10 @@ class AthanorChannelController(AthanorController):
         chan_sys = self.find_system(sys_key)
         return chan_sys.rename_category(session, name, verify_name)
 
+    def lock_system(self, session, sys_key, lock_data):
+        chan_sys = self.find_system(sys_key)
+        return chan_sys.lock(session, lock_data)
+
     def lock_category(self, session, sys_key, name, lock_data):
         chan_sys = self.find_system(sys_key)
         return chan_sys.lock_category(session, name, lock_data)

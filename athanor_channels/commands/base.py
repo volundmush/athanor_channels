@@ -1,7 +1,5 @@
 import re
 
-from evennia.utils.utils import lazy_property
-
 from athanor.commands.command import AthanorCommand
 from athanor.utils.text import Speech
 
@@ -17,7 +15,7 @@ class HasChannelSystem(AthanorCommand):
         if not path:
             raise ValueError(err)
         if path == '/':
-            return (self.chan_sys)
+            return [self.chan_sys]
         if '/' not in path:
             return (self.chan_sys, self.chan_sys.find_category(self.session, path))
         else:
@@ -169,20 +167,31 @@ class AbstractChannelAdminCommand(HasDisplayList):
         super().__init__(*args, **kwargs)
         self.__doc__ = _ADMIN_DOC.format(system_key=self.system_key, key=self.key)
 
+    def display_channel_info(self):
+        target = self.target_channel(self.lhs, self.lhslist)
+        if len(target) == 1:
+            self.msg(self.controllers.get('channel').examine_system(self.session, target[0]))
+        if len(target) == 2:
+            self.msg(self.controllers.get('channel').examine_category(self.session, target[0], target[1]))
+        if len(target) == 3:
+            self.msg(self.controllers.get('channel').examine_channel(self.session, target[0], target[1], target[2]))
+
     def switch_create(self):
         err = f"Usage: {self.key}/create <CategoryName> OR {self.key}/create <Category>/<ChannelName>"
-        if not self.args:
+        if not self.lhs:
             raise ValueError(err)
-        if self.args == '/':
+        if self.lhs == '/':
             raise ValueError(err)
-        if '/' in self.args:
-            cat_path, chan_name = self.args.split('/', 1)
+        if '/' in self.lhs:
+            cat_path, chan_name = self.lhs.split('/', 1)
             if not cat_path or not chan_name:
                 raise ValueError(err)
             category = self.chan_sys.find_category(self.session, cat_path)
-            self.controllers.get('channel').create_channel(self.session, self.chan_sys, category, chan_name)
+            result = self.controllers.get('channel').create_channel(self.session, self.chan_sys, category, chan_name)
         else:
-            self.controllers.get('channel').create_category(self.session, self.chan_sys, self.args)
+            result = self.controllers.get('channel').create_category(self.session, self.chan_sys, self.args)
+        if result and self.rhs:
+            result.change_description(self.session, self.rhs)
 
     def switch_rename(self):
         cmd = f"{self.key}/rename"
@@ -191,7 +200,7 @@ class AbstractChannelAdminCommand(HasDisplayList):
         if len(target) == 1:
             raise ValueError(err)
         if len(target) == 2:
-            self.controllers.get('channel').rename_category(self.session, target[0], target[1], self.rhs)
+            self.controllers.get('channel').rename_category(self.session, self.systarget[0], target[1], self.rhs)
         if len(target) == 3:
             self.controllers.get('channel').rename_channel(self.session, target[0], target[1], target[2], self.rhs)
 
@@ -230,32 +239,38 @@ class AbstractChannelAdminCommand(HasDisplayList):
         target = self.target_channel(self.lhs, self.lhslist)
         if not len(self.rhslist) > 1:
             raise ValueError(err)
+        position = self.rhslist[0]
         subjects = self.user_parselist(self.rhslist[1:])
-        if len(target) == 1:
-            self.controllers.get('channel').grant_system(self.session, target[0], subjects)
-        if len(target) == 2:
-            self.controllers.get('channel').grant_category(self.session, target[0], target[1], subjects)
-        if len(target) == 3:
-            self.controllers.get('channel').grant_channel(self.session, target[0], target[1], target[2], subjects)
+        for subject in subjects:
+            if len(target) == 1:
+                self.controllers.get('channel').grant_system(self.session, target[0], position, subject)
+            if len(target) == 2:
+                self.controllers.get('channel').grant_category(self.session, target[0], target[1], position, subject)
+            if len(target) == 3:
+                self.controllers.get('channel').grant_channel(self.session, target[0], target[1], target[2], position, subject)
 
     def switch_revoke(self):
         cmd = f"{self.key}/revoke"
         err = f"Usage: {cmd} {_TARGET}=<position>,<user1>[,<user2>,<user3>...]"
         target = self.target_channel(self.lhs, self.lhslist)
-        if not len(self.rhslist) > 2:
+        if not len(self.rhslist) > 1:
             raise ValueError(err)
+        position = self.rhslist[0]
         subjects = self.user_parselist(self.rhslist[1:])
-        if len(target) == 1:
-            self.controllers.get('channel').revoke_system(self.session, target[0], subjects)
-        if len(target) == 2:
-            self.controllers.get('channel').revoke_category(self.session, target[0], target[1], subjects)
-        if len(target) == 3:
-            self.controllers.get('channel').revoke_channel(self.session, target[0], target[1], target[2], subjects)
+        for subject in subjects:
+            if len(target) == 1:
+                self.controllers.get('channel').revoke_system(self.session, target[0], position, subject)
+            if len(target) == 2:
+                self.controllers.get('channel').revoke_category(self.session, target[0], target[1], position, subject)
+            if len(target) == 3:
+                self.controllers.get('channel').revoke_channel(self.session, target[0], target[1], target[2], position, subject)
 
     def switch_ban(self):
         cmd = f"{self.key}/ban"
         err = f"Usage: {cmd} {_TARGET}=<user>,<duration1>"
         target = self.target_channel(self.lhs, self.lhslist)
+        if not len(self.rhslist) == 2:
+            raise ValueError(err)
         if len(target) == 1:
             self.controllers.get('channel').ban_system(self.session, target[0], self.rhs)
         if len(target) == 2:
@@ -267,7 +282,6 @@ class AbstractChannelAdminCommand(HasDisplayList):
         cmd = f"{self.key}/ban"
         err = f"Usage: {cmd} {_TARGET}>=<user>"
         target = self.target_channel(self.lhs, self.lhslist)
-        subjects = self.user_parselist(self.rhslist)
         if len(target) == 1:
             self.controllers.get('channel').unban_system(self.session, target[0], self.rhs)
         if len(target) == 2:
@@ -313,32 +327,3 @@ class AbstractChannelUseCommand(HasDisplayList):
         if not self.re_alias.match(self.rhs):
             raise ValueError(err)
         self.caller.channels.add(target[2], self.rhs)
-
-    def switch_leave(self):
-        self.caller.channels.remove(self.args)
-
-    def switch_codename(self):
-        self.caller.channels.codename(self.lhs, self.rhs)
-
-    def switch_title(self):
-        self.caller.channels.title(self.lhs, self.rhs)
-
-    def switch_altname(self):
-        self.caller.channels.altname(self.lhs, self.rhs)
-
-    def switch_mute(self):
-        self.caller.channels.mute(self.args)
-
-    def switch_unmute(self):
-        self.caller.channels.unmute(self.args)
-
-    def switch_on(self):
-        self.caller.channels.on(self.args)
-
-    def switch_off(self):
-        self.caller.channels.off(self.args)
-
-
-
-
-

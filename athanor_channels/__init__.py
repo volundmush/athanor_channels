@@ -57,3 +57,7 @@ def init_settings(settings):
         }
     }
     settings.OPERATIONS.update(operations)
+
+    settings.EXAMINE_HOOKS['channel'] = ()
+    settings.EXAMINE_HOOKS['channel_category'] = ()
+    settings.EXAMINE_HOOKS['channel_system'] = ()
