@@ -30,12 +30,12 @@ class HasChanOps(HasOps, HasRenderExamine):
         return self.render_examine_callback(None, viewer, callback=callback)
 
     def examine(self, session):
-        if not (enactor := self.get_enactor(session)) or not self.is_position(enactor, 'operator'):
+        if not (enactor := self.get_enactor(session)) or not self.check_position(enactor, 'operator'):
             raise ValueError("Permission denied.")
         return self.render_examine(enactor, callback=False)
 
     def parent_position(self, user, position):
-        return self.parent.is_position(user, position)
+        return self.parent.check_position(user, position)
 
 
 class AbstractChannel(HasChanOps, DefaultChannel):
@@ -155,7 +155,7 @@ class AbstractChannel(HasChanOps, DefaultChannel):
 
     def allowed_listeners(self):
         subscriptions = self.subscriptions.exclude(Q(db_muted=True) | Q(db_enabled=False))
-        return {sub for sub in subscriptions if self.is_position(sub.owner, 'listener')}
+        return {sub for sub in subscriptions if self.check_position(sub.owner, 'listener')}
 
     def active_listeners(self, allowed=None):
         if allowed is None:
@@ -275,7 +275,7 @@ class AbstractChannelCategory(HasChanOps, AthanorOptionScript):
         return self.access(checker, lock) or self.system.access(checker, lock)
 
     def create_channel(self, session, name):
-        if not (enactor := self.get_enactor(session)) or not self.is_position(enactor, 'operator'):
+        if not (enactor := self.get_enactor(session)) or not self.check_position(enactor, 'operator'):
             raise ValueError("Permission denied.")
         new_channel = self.system.ndb.channel_typeclass.create_channel(self, name)
         entities = {'enactor': enactor, 'target': new_channel}
@@ -283,10 +283,10 @@ class AbstractChannelCategory(HasChanOps, AthanorOptionScript):
         return new_channel
 
     def rename_channel(self, session, name, new_name):
-        if not (enactor := self.get_enactor(session)) or not self.is_position(enactor, 'operator'):
+        if not (enactor := self.get_enactor(session)) or not self.check_position(enactor, 'operator'):
             raise ValueError("Permission denied.")
         channel = self.find_channel(enactor, name)
-        if not self.is_position(enactor, 'operator'):
+        if not self.check_position(enactor, 'operator'):
             raise ValueError("Permission denied.")
         old_name = channel.fullname
         changed_name = channel.rename(new_name)
@@ -294,7 +294,7 @@ class AbstractChannelCategory(HasChanOps, AthanorOptionScript):
         cmsg.Rename(entities, old_name=old_name).send()
 
     def delete_channel(self, session, name, verify_name):
-        if not (enactor := self.get_enactor(session)) or not self.is_position(enactor, 'operator'):
+        if not (enactor := self.get_enactor(session)) or not self.check_position(enactor, 'operator'):
             raise ValueError("Permission denied.")
         channel = self.find_channel(enactor, name)
         if not verify_name and verify_name.lower() == str(channel).lower():
@@ -461,7 +461,7 @@ class AbstractChannelSystem(HasChanOps, AthanorOptionScript):
         raise ValueError(f"Cannot find Channel Category: {name}")
 
     def create_category(self, session, name):
-        if not (enactor := self.get_enactor(session)) or not self.is_position(enactor, 'operator'):
+        if not (enactor := self.get_enactor(session)) or not self.check_position(enactor, 'operator'):
             raise ValueError("Permission denied.")
         new_category = self.ndb.category_typeclass.create_channel_category(self, name)
         entities = {'enactor': enactor, 'target': new_category}
@@ -469,7 +469,7 @@ class AbstractChannelSystem(HasChanOps, AthanorOptionScript):
         return new_category
 
     def rename_category(self, session, name, new_name):
-        if not (enactor := self.get_enactor(session)) or not self.is_position(enactor, 'operator'):
+        if not (enactor := self.get_enactor(session)) or not self.check_position(enactor, 'operator'):
             raise ValueError("Permission denied.")
         category = self.find_category(enactor, name)
         old_name = category.fullname
@@ -479,7 +479,7 @@ class AbstractChannelSystem(HasChanOps, AthanorOptionScript):
         return changed_name
 
     def delete_category(self, session, name, verify_name):
-        if not (enactor := self.get_enactor(session)) or not self.is_position(enactor, 'operator'):
+        if not (enactor := self.get_enactor(session)) or not self.check_position(enactor, 'operator'):
             raise ValueError("Permission denied.")
         category = self.find_category(enactor, name)
         if not verify_name and not verify_name.lower() == str(category).lower():
@@ -600,7 +600,7 @@ class AbstractChannelSystem(HasChanOps, AthanorOptionScript):
         return AbstractChannel.objects.filter_family(channel_bridge__db_category__db_system__db_script=self).order_by('channel_bridge__db_category__db_name', 'db_key')
 
     def visible_channels(self, user):
-        return [channel for channel in self.channels() if channel.is_position(user, 'listener')]
+        return [channel for channel in self.channels() if channel.check_position(user, 'listener')]
 
     def target_channel(self, session, category, name):
         if not (enactor := self.get_enactor(session)):
