@@ -88,29 +88,29 @@ class AthanorChannelController(AthanorController):
         chan_sys = self.find_system(sys_key)
         return chan_sys.config_channel(session, category, name, config_op, config_val)
 
-    def grant_system(self, session, sys_key, position, subjects):
+    def grant_system(self, session, sys_key, user, position):
         chan_sys = self.find_system(sys_key)
-        return chan_sys.grant(session, position, subjects)
+        return chan_sys.grant(session, user, position)
     
-    def grant_category(self, session, sys_key, name, position, subjects):
+    def grant_category(self, session, sys_key, name, user, position):
         chan_sys = self.find_system(sys_key)
-        return chan_sys.grant_category(session, name, position, subjects)
+        return chan_sys.grant_category(session, name, user, position)
     
-    def grant_channel(self, session, sys_key, category, name, position, subjects):
+    def grant_channel(self, session, sys_key, category, name, user, position):
         chan_sys = self.find_system(sys_key)
-        return chan_sys.grant_channel(session, category, name, position, subjects)
+        return chan_sys.grant_channel(session, category, name, user, position)
 
-    def revoke_system(self, session, sys_key, position, subjects):
+    def revoke_system(self, session, sys_key, user, position):
         chan_sys = self.find_system(sys_key)
-        return chan_sys.revoke(session, position, subjects)
+        return chan_sys.revoke(session, user, position)
 
-    def revoke_category(self, session, sys_key, name, position, subjects):
+    def revoke_category(self, session, sys_key, name, user, position):
         chan_sys = self.find_system(sys_key)
-        return chan_sys.revoke_category(session, name, position, subjects)
+        return chan_sys.revoke_category(session, name, user, position)
 
-    def revoke_channel(self, session, sys_key, category, name, position, subjects):
+    def revoke_channel(self, session, sys_key, category, name, user, position):
         chan_sys = self.find_system(sys_key)
-        return chan_sys.revoke_channel(session, category, name, position, subjects)
+        return chan_sys.revoke_channel(session, category, name, user, position)
 
     def ban_system(self, session, sys_key, user, duration):
         chan_sys = self.find_system(sys_key)
@@ -151,3 +151,7 @@ class AthanorChannelController(AthanorController):
     def examine_channel(self, session, sys_key, category, name):
         chan_sys = self.find_system(sys_key)
         return chan_sys.examine_channel(session, category, name)
+
+    def target_channel(self, session, sys_key, category, name):
+        chan_sys = self.find_system(sys_key)
+        return chan_sys.target_channel(session, category, name)

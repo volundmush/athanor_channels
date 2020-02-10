@@ -31,7 +31,6 @@ class AbstractChannelHandler(object):
                 subscription=subscription
             )
             cmdset.add(cmd)
-            self.check_listen(subscription.db_channel)
         self._cached_cmdset = cmdset
         self._cached = True
 
@@ -116,11 +115,12 @@ class AbstractChannelHandler(object):
         all_aliases = self.subscriptions.filter(db_channel=channel)
         listening = True if self.owner in channel.listeners else False
         # If listening and shouldn't be...
+        permission = channel.is_position(self.owner, 'listener')
         if listening:
-            if not all_aliases.filter(Q(db_muted=False) | Q(db_enabled=True)).count():
+            if not permission or not all_aliases.filter(Q(db_muted=False) | Q(db_enabled=True)).count():
                 channel.remove_listener(self.owner)
         else:
-            if all_aliases.filter(Q(db_muted=False) | Q(db_enabled=True)).count():
+            if permission and all_aliases.filter(Q(db_muted=False) | Q(db_enabled=True)).count():
                 channel.add_listener(self.owner)
 
     def mute(self, alias):

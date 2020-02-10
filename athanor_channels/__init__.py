@@ -30,34 +30,6 @@ def init_settings(settings):
     settings.OPTIONS_ACCOUNT_DEFAULT['self_channel'] = ("Color for your own name in channel dialogue.", "Color", 'n')
     settings.OPTIONS_ACCOUNT_DEFAULT['other_channel'] = ("Default Color for names on channels.", "Color", 'n')
 
-    operations = {
-        "channel_system_operate": {
-            "description": "Is an Operator for all Channel Systems. All of them.",
-            "permission": "Admin"
-        },
-        "channel_system_moderate": {
-            "description": "Is a Moderator for all Channel Systems. All of them.",
-            "permission": "Admin"
-        },
-        "channel_category_operate": {
-            "description": "Is an Operator for all established Channel Categories. All of them.",
-            "permission": "Admin"
-        },
-        "channel_category_moderate": {
-            "description": "Is a Moderator for all established Channel Categories. All of them.",
-            "permission": "Admin"
-        },
-        "channel_operate": {
-            "description": "Is an Operator for all established Channels. All of them.",
-            "permission": "Admin"
-        },
-        "channel_moderate": {
-            "description": "Is a Moderator for all established Channels. All of them.",
-            "permission": "Admin"
-        }
-    }
-    settings.OPERATIONS.update(operations)
-
     settings.EXAMINE_HOOKS['channel'] = ()
     settings.EXAMINE_HOOKS['channel_category'] = ()
     settings.EXAMINE_HOOKS['channel_system'] = ()

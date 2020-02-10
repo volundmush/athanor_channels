@@ -6,25 +6,32 @@ from athanor.utils.text import Speech
 
 class HasChannelSystem(AthanorCommand):
     lhs_delim = '/'
+    controller_key = 'channel'
+    entity_types = {
+        1: 'system',
+        2: 'category',
+        3: 'channel'
+    }
 
     def at_pre_cmd(self):
-        self.chan_sys = self.controllers.get('channel').find_system(self.system_key)
+        self.chan_sys = self.controller.find_system(self.system_key)
 
-    def target_channel(self, path, pathlist):
-        err = "Must target a channel! Format: / for System, <name> for Category, <Category>/<name> for Channel"
+    def target_channel(self, path):
+        err = "Target Format: / for System, <name> for Category, <Category>/<name> for Channel"
         if not path:
             raise ValueError(err)
-        if path == '/':
-            return [self.chan_sys]
-        if '/' not in path:
-            return (self.chan_sys, self.chan_sys.find_category(self.session, path))
+        if len(path) == 1:
+            if path[0] == '/':
+                return [self.chan_sys]
+            else:
+                return (self.chan_sys, self.chan_sys.find_category(self.session, path[0].strip()))
         else:
-            path = pathlist
             if len(path) > 2:
                 raise ValueError(err)
-            category = self.chan_sys.find_category(self.session, pathlist[0])
-            channel = category.find_channel(self.session, pathlist[1])
-            return (self.chan_sys, category, channel)
+            return self.chan_sys.target_channel(self.session, path[0], path[1])
+
+    def parse_targets(self, target):
+        return self.target_channel(target)
 
 
 class HasDisplayList(HasChannelSystem):
@@ -36,6 +43,7 @@ class HasDisplayList(HasChannelSystem):
         if not self.args:
             return self.msg(self.chan_sys.render_channel_list(self.session))
         return self.display_channel_info()
+
 
 _CHANNEL_DOC = """
 This command was created as an alias to a {system_key} Channel.
@@ -68,7 +76,8 @@ Usage:
 
 class AbstractChannelCommand(HasChannelSystem, AthanorCommand):
     switch_options = ('who', 'leave', 'title', 'altname', 'mute', 'unmute', 'codename', 'on', 'off')
-    controller = None
+    controller_key = 'channel'
+    user_controller = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -77,11 +86,13 @@ class AbstractChannelCommand(HasChannelSystem, AthanorCommand):
     def switch_main(self):
         subscrip = self.subscription
         channel = subscrip.db_channel
+        if not channel.is_position(self.caller, 'speaker'):
+            raise ValueError("Permission denied.")
         alternate_name = None
         if subscrip.db_ccodename:
             alternate_name = subscrip.db_ccodename
         speech_obj = Speech(speaker=self.caller, speech_text=self.args, mode="channel", title=subscrip.db_title,
-                            alternate_name=alternate_name, controller=self.controller)
+                            alternate_name=alternate_name, controller=self.user_controller)
         channel.broadcast(speech_obj, self.session)
 
     def switch_leave(self):
@@ -116,6 +127,7 @@ _ADMIN_DOC = """
 This command is for administrating the {system_key} Channel System.
 
 Note: For below, <target> is either a <category> or a <category>/<channel>
+    Some commands allow targeting all Categories ('System') via /
 
 Usage:
     {key}
@@ -131,163 +143,120 @@ Usage:
     
     {key}/lock <target>=<lock string>
         Sets an Evennia lock string to the category[/channel].
-        Please don't screw with this if you don't know what you're doing.
-    
-    {key}/grant <target>=<position>,<user1>[,<user2>,<user3>,<user4>,...]
-        Grants one or more users <position> over target.
-        <position> can be moderator or operator. Explained further down.
-        if <target> is /, it grants the position to all categories.
+        Access types are 'listener', 'speaker', etc, listed below.
+        Whoever passes these locks gains that Position without being
+        explicitly granted it. Use with caution.
+        
+    {key}/grant <target>=<user>,<position>
+        Grants a user <position> over target. Positions are explained below.
+        Granting to System/Category cascades to Categories/Channels.
         Use {key}/revoke with the same syntax to revoke positions.
     
     {key}/ban <target>=<user>,<duration>
         Prevent a specific person from using this channel.
         <duration> must be a simple string such as 7d (7 days) or 5h.
+        Banning from System/Category cascades to Categories/Channels.
         Use {key}/unban <target>=<user> to rescind a ban early.
 
-Concepts:
-    Moderators: Moderators can use disciplinary commands on users.
-    Operators: Operators can alter configurations and create/delete 
-        resources such as channels.
-        Operators also possess all Moderator powers.
-    Hierarchy: The Channel System is arranged as 
-        System -> Category -> Channel.
-        If you are a <position> in a parent entity, you inherit this 
-        position on all child entities. IE: If you have Operator status
-        on a Category, you have power over all channels in that category.
+Hierarchy: 
+    The Channel System is arranged as System -> Category -> Channel.
+
+Positions:
+    The below are access tiers. higher tiers implicitly count
+    as lower tiers. IE: An Operator is a Moderator, a Speaker is 
+    a Listener.
+    
+    Listener: Listeners can join channels and hear messages.
+    Speaker: Speakers can send messages over channels.
+    Moderator: Moderators can use disciplinary commands on users.
+    Operator: Operators can alter configurations and create/delete
+        resources.
+
 """
 
-
-_TARGET = "<category>[/<channel>] OR /"
+_TARGET = "<category>[/<channel>]"
 
 
 class AbstractChannelAdminCommand(HasDisplayList):
-    switch_options = ('create', 'rename', 'lock', 'config', 'grant', 'revoke', 'ban')
+    switch_options = ('create', 'rename', 'lock', 'config', 'grant', 'revoke', 'ban', 'unban')
+    switch_syntax = {
+        'create': f"{_TARGET}[=<description]",
+        'rename': f"{_TARGET}=<new name>",
+        'lock': f"{_TARGET}=<lockstring>",
+        'config': f"{_TARGET}=<option>/<value>",
+        'grant': f"{_TARGET}=<user>,<position>",
+        'revoke': f"{_TARGET}=<user>,<position>",
+        'ban': f"{_TARGET}=<user>,<duration>",
+        'unban': f"{_TARGET}=<user>",
+    }
+    lhs_delim = '/'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__doc__ = _ADMIN_DOC.format(system_key=self.system_key, key=self.key)
 
-    def display_channel_info(self):
-        target = self.target_channel(self.lhs, self.lhslist)
-        if len(target) == 1:
-            self.msg(self.controllers.get('channel').examine_system(self.session, target[0]))
-        if len(target) == 2:
-            self.msg(self.controllers.get('channel').examine_category(self.session, target[0], target[1]))
-        if len(target) == 3:
-            self.msg(self.controllers.get('channel').examine_channel(self.session, target[0], target[1], target[2]))
-
     def switch_create(self):
-        err = f"Usage: {self.key}/create <CategoryName> OR {self.key}/create <Category>/<ChannelName>"
-        if not self.lhs:
-            raise ValueError(err)
-        if self.lhs == '/':
-            raise ValueError(err)
-        if '/' in self.lhs:
-            cat_path, chan_name = self.lhs.split('/', 1)
-            if not cat_path or not chan_name:
-                raise ValueError(err)
-            category = self.chan_sys.find_category(self.session, cat_path)
-            result = self.controllers.get('channel').create_channel(self.session, self.chan_sys, category, chan_name)
+        if len(self.lhslist) == 1:
+            result = self.controller.create_category(self.session, self.chan_sys, self.lhslist[0])
+        elif len(self.lhslist) == 2:
+            result = self.controller.create_channel(self.session, self.chan_sys, self.lhslist[0], self.lhslist[1])
         else:
-            result = self.controllers.get('channel').create_category(self.session, self.chan_sys, self.args)
-        if result and self.rhs:
-            result.change_description(self.session, self.rhs)
+            self.syntax_error()
+        if self.rhs:
+            result.describe(self.session, self.rhs)
 
-    def switch_rename(self):
-        cmd = f"{self.key}/rename"
-        err = f"Usage: {cmd} {_TARGET}=<new name>"
-        target = self.target_channel(self.lhs, self.lhslist)
+    def _switch_basic(self, operation):
+        target = self.target_channel(self.lhslist)
+        if not (entity := self.entity_types.get(len(target), None)):
+            self.syntax_error()
+        op = getattr(self.controller, f"{operation}_{entity}")
+        if not op:
+            raise ValueError("Code error! Please contact staff!")
+        return (target, op)
+
+    def _switch_single(self, operation):
+        target, op = self._switch_basic(operation)
         if len(target) == 1:
-            raise ValueError(err)
+            return op(self.session, target[0], self.rhs)
         if len(target) == 2:
-            self.controllers.get('channel').rename_category(self.session, self.systarget[0], target[1], self.rhs)
+            return op(self.session, *target, self.rhs)
         if len(target) == 3:
-            self.controllers.get('channel').rename_channel(self.session, target[0], target[1], target[2], self.rhs)
+            return op(self.session, *target, self.rhs)
 
-    def switch_lock(self):
-        cmd = f"{self.key}/lock"
-        err = f"Usage: {cmd} {_TARGET}=<lockstring>"
-        target = self.target_channel(self.lhs, self.lhslist)
-        if not self.rhs:
-            raise ValueError(err)
+    def _switch_multi(self, operation, multi_count):
+        target, op = self._switch_basic(operation)
+        if len(self.rhslist) != multi_count:
+            self.syntax_error()
         if len(target) == 1:
-            self.controllers.get('channel').lock_system(self.session, target[0], self.rhs)
+            return op(self.session, target[0], *self.rhslist)
         if len(target) == 2:
-            self.controllers.get('channel').lock_category(self.session, target[0], target[1], self.rhs)
+            return op(self.session, *target, *self.rhslist)
         if len(target) == 3:
-            self.controllers.get('channel').lock_channel(self.session, target[0], target[1], target[2], self.rhs)
+            return op(self.session, *target, *self.rhslist)
 
-    def switch_config(self):
-        cmd = f"{self.key}/config"
-        err = f"Usage: {cmd} {_TARGET}=<op>,<val>"
-        target = self.target_channel(self.lhs, self.lhslist)
-        if not self.rhs or not len(self.rhslist) == 2:
-            raise ValueError(err)
-        if len(target) == 1:
-            self.controllers.get('channel').config_system(self.session, target[0], *self.rhslist)
-        if len(target) == 2:
-            self.controllers.get('channel').config_category(self.session, target[0], target[1], *self.rhslist)
-        if len(target) == 3:
-            self.controllers.get('channel').config_channel(self.session, target[0], target[1], target[2], *self.rhslist)
-
-    def user_parselist(self, users):
-        return [self.user_parse(user) for user in users]
+    def display_channel_info(self):
+        self.msg(self._switch_single('examine'))
 
     def switch_grant(self):
-        cmd = f"{self.key}/grant"
-        err = f"Usage: {cmd} {_TARGET}=<position>,<user1>[,<user2>,<user3>...]"
-        target = self.target_channel(self.lhs, self.lhslist)
-        if not len(self.rhslist) > 1:
-            raise ValueError(err)
-        position = self.rhslist[0]
-        subjects = self.user_parselist(self.rhslist[1:])
-        for subject in subjects:
-            if len(target) == 1:
-                self.controllers.get('channel').grant_system(self.session, target[0], position, subject)
-            if len(target) == 2:
-                self.controllers.get('channel').grant_category(self.session, target[0], target[1], position, subject)
-            if len(target) == 3:
-                self.controllers.get('channel').grant_channel(self.session, target[0], target[1], target[2], position, subject)
+        return self._switch_multi('grant', 2)
 
     def switch_revoke(self):
-        cmd = f"{self.key}/revoke"
-        err = f"Usage: {cmd} {_TARGET}=<position>,<user1>[,<user2>,<user3>...]"
-        target = self.target_channel(self.lhs, self.lhslist)
-        if not len(self.rhslist) > 1:
-            raise ValueError(err)
-        position = self.rhslist[0]
-        subjects = self.user_parselist(self.rhslist[1:])
-        for subject in subjects:
-            if len(target) == 1:
-                self.controllers.get('channel').revoke_system(self.session, target[0], position, subject)
-            if len(target) == 2:
-                self.controllers.get('channel').revoke_category(self.session, target[0], target[1], position, subject)
-            if len(target) == 3:
-                self.controllers.get('channel').revoke_channel(self.session, target[0], target[1], target[2], position, subject)
+        return self._switch_multi('revoke', 2)
 
     def switch_ban(self):
-        cmd = f"{self.key}/ban"
-        err = f"Usage: {cmd} {_TARGET}=<user>,<duration1>"
-        target = self.target_channel(self.lhs, self.lhslist)
-        if not len(self.rhslist) == 2:
-            raise ValueError(err)
-        if len(target) == 1:
-            self.controllers.get('channel').ban_system(self.session, target[0], self.rhs)
-        if len(target) == 2:
-            self.controllers.get('channel').ban_category(self.session, target[0], target[1], self.rhs)
-        if len(target) == 3:
-            self.controllers.get('channel').ban_channel(self.session, target[0], target[1], target[2], self.rhs)
+        return self._switch_multi('ban', 2)
 
     def switch_unban(self):
-        cmd = f"{self.key}/ban"
-        err = f"Usage: {cmd} {_TARGET}>=<user>"
-        target = self.target_channel(self.lhs, self.lhslist)
-        if len(target) == 1:
-            self.controllers.get('channel').unban_system(self.session, target[0], self.rhs)
-        if len(target) == 2:
-            self.controllers.get('channel').unban_category(self.session, target[0], target[1], self.rhs)
-        if len(target) == 3:
-            self.controllers.get('channel').unban_channel(self.session, target[0], target[1], target[2], self.rhs)
+        return self._switch_single('unban')
+
+    def switch_rename(self):
+        return self._switch_single('rename')
+
+    def switch_lock(self):
+        return self._switch_single('lock')
+
+    def switch_config(self):
+        return self._switch_multi('config', 2)
 
 
 _USE_COMMAND = """
@@ -314,16 +283,18 @@ Usage:
 class AbstractChannelUseCommand(HasDisplayList):
     switch_options = ('join', 'who', 'info')
     re_alias = re.compile(r"(?i)^([^\/\s])+$")
+    switch_syntax = {
+        'join': "<category>/<channel>=<alias> - Keep Aliases simple!"
+    }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__doc__ = _USE_COMMAND.format(key=self.key, system_key=self.system_key)
 
     def switch_join(self):
-        target = self.target_channel(self.lhs, self.lhslist)
-        err = f"Usage: {self.key}/join <Category>/<Channel>=<alias> - Aliases must be simple, disallowing whitespace or /"
+        target = self.target_channel(self.lhslist)
         if not len(target) == 3:
-            raise ValueError(err)
+            self.syntax_error()
         if not self.re_alias.match(self.rhs):
-            raise ValueError(err)
+            self.syntax_error()
         self.caller.channels.add(target[2], self.rhs)

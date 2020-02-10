@@ -75,6 +75,9 @@ class AccountChannelSubscription(AbstractChannelSubscription):
     def siblings(self):
         return self.db_channel.account_subscriptions.exclude(id=self.id)
 
+    @property
+    def owner(self):
+        return self.db_account
 
 class CharacterChannelSubscription(AbstractChannelSubscription):
     db_object = models.ForeignKey('objects.ObjectDB', related_name='channel_subscriptions', on_delete=models.CASCADE)
@@ -87,3 +90,7 @@ class CharacterChannelSubscription(AbstractChannelSubscription):
     @property
     def siblings(self):
         return self.db_channel.character_subscriptions.exclude(id=self.id)
+
+    @property
+    def owner(self):
+        return self.db_object
