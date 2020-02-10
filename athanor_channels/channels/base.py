@@ -37,6 +37,9 @@ class HasChanOps(HasOps, HasRenderExamine):
     def parent_position(self, user, position):
         return self.parent.check_position(user, position)
 
+    def describe(self, session, new_description):
+        pass
+
 
 class AbstractChannel(HasChanOps, DefaultChannel):
     """
@@ -61,7 +64,7 @@ class AbstractChannel(HasChanOps, DefaultChannel):
 
     @property
     def cname(self):
-        return self.bridge.cname
+        return ANSIString(self.bridge.cname)
 
     @lazy_property
     def description(self):
@@ -126,6 +129,8 @@ class AbstractChannel(HasChanOps, DefaultChannel):
         Returns:
             key (ANSIString): The successful key set.
         """
+        if '|' in key and not key.endswith('|n'):
+            key = key + '|n'
         key = ANSIString(key)
         clean_key = key.clean()
         if '|' in clean_key:
@@ -180,7 +185,7 @@ class AbstractChannelCategory(HasChanOps, AthanorOptionScript):
 
     @property
     def cname(self):
-        return self.bridge.cname
+        return ANSIString(self.bridge.cname)
 
     @property
     def fullname(self):
@@ -188,7 +193,7 @@ class AbstractChannelCategory(HasChanOps, AthanorOptionScript):
 
     def generate_substitutions(self, viewer):
         return {"name": str(self),
-                "cname": self.bridge.cname,
+                "cname": self.cname,
                 "fullname": self.fullname,
                 'typename': 'Channel Category'}
 
@@ -215,6 +220,8 @@ class AbstractChannelCategory(HasChanOps, AthanorOptionScript):
 
     @classmethod
     def create_channel_category(cls, chan_sys, key):
+        if '|' in key and not key.endswith('|n'):
+            key += '|n'
         key = ANSIString(key)
         clean_key = str(key.clean())
         if '|' in clean_key:
@@ -240,6 +247,8 @@ class AbstractChannelCategory(HasChanOps, AthanorOptionScript):
         Returns:
             key (ANSIString): The successful key set.
         """
+        if '|' in key and not key.endswith('|n'):
+            key += '|n'
         key = ANSIString(key)
         clean_key = str(key.clean())
         if '|' in clean_key:
@@ -413,6 +422,8 @@ class AbstractChannelSystem(HasChanOps, AthanorOptionScript):
 
     @classmethod
     def create_channel_system(cls, name, category_typeclass, channel_typeclass, command_class):
+        if '|' in name and not name.endswith('|n'):
+            name += '|n'
         key = ANSIString(name)
         clean_key = str(key.clean())
         if '|' in clean_key:
