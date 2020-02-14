@@ -141,6 +141,9 @@ Usage:
         Renames the targeted category[/channel]. and optionally sets a
         description.
     
+    {key}/describe <target>=<new description>
+        Changes description for a category[/channel].
+    
     {key}/lock <target>=<lock string>
         Sets an Evennia lock string to the category[/channel].
         Access types are 'listener', 'speaker', etc, listed below.
@@ -178,7 +181,7 @@ _TARGET = "<category>[/<channel>]"
 
 
 class AbstractChannelAdminCommand(HasDisplayList):
-    switch_options = ('create', 'rename', 'lock', 'config', 'grant', 'revoke', 'ban', 'unban')
+    switch_options = ('create', 'rename', 'lock', 'config', 'grant', 'revoke', 'ban', 'unban', 'describe')
     switch_syntax = {
         'create': f"{_TARGET}[=<description]",
         'rename': f"{_TARGET}=<new name>",
@@ -188,6 +191,7 @@ class AbstractChannelAdminCommand(HasDisplayList):
         'revoke': f"{_TARGET}=<user>,<position>",
         'ban': f"{_TARGET}=<user>,<duration>",
         'unban': f"{_TARGET}=<user>",
+        'describe': f"{_TARGET}=<new description>"
     }
     lhs_delim = '/'
 
@@ -236,6 +240,9 @@ class AbstractChannelAdminCommand(HasDisplayList):
 
     def display_channel_info(self):
         self.msg(self._switch_single('examine'))
+
+    def switch_describe(self):
+        return self._switch_single('describe')
 
     def switch_grant(self):
         return self._switch_multi('grant', 2)

@@ -155,3 +155,14 @@ class AthanorChannelController(AthanorController):
     def target_channel(self, session, sys_key, category, name):
         chan_sys = self.find_system(sys_key)
         return chan_sys.target_channel(session, category, name)
+
+    def describe_system(self, session, sys_key, description):
+        raise ValueError("Cannot describe a system!")
+
+    def describe_category(self, session, sys_key, category, description):
+        chan_sys = self.find_system(sys_key)
+        return chan_sys.describe_category(session, category, description)
+
+    def describe_channel(self, session, sys_key, category, name, description):
+        chan_sys = self.find_system(sys_key)
+        return chan_sys.describe_channel(session, category, name, description)

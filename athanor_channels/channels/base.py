@@ -37,8 +37,16 @@ class HasChanOps(HasOps, HasRenderExamine):
     def parent_position(self, user, position):
         return self.parent.check_position(user, position)
 
+    @property
+    def description(self):
+        return self.db.desc
+
     def describe(self, session, new_description):
-        pass
+        if not (enactor := self.get_enactor(session)) or not self.is_position(enactor, 'operator'):
+            raise ValueError("Permission denied.")
+        if not new_description:
+            raise ValueError("Nothing entered to set!")
+        self.db.desc = new_description
 
 
 class AbstractChannel(HasChanOps, DefaultChannel):
@@ -65,10 +73,6 @@ class AbstractChannel(HasChanOps, DefaultChannel):
     @property
     def cname(self):
         return ANSIString(self.bridge.cname)
-
-    @lazy_property
-    def description(self):
-        return self.get_or_create_attribute(key='desc', default='')
 
     @property
     def fullname(self):
@@ -360,6 +364,12 @@ class AbstractChannelCategory(HasChanOps, AthanorOptionScript):
         channel = self.find_channel(enactor, name)
         return channel.examine(session)
 
+    def describe_channel(self, session, name, description):
+        if not (enactor := self.get_enactor(session)):
+            raise ValueError("Permission denied.")
+        channel = self.find_channel(enactor, name)
+        return channel.describe(session, description)
+
 
 class AbstractChannelSystem(HasChanOps, AthanorOptionScript):
     examine_type = 'channel_system'
@@ -606,6 +616,18 @@ class AbstractChannelSystem(HasChanOps, AthanorOptionScript):
             raise ValueError("Permission denied.")
         category = self.find_category(enactor, category)
         return category.examine_channel(session, name)
+
+    def describe_category(self, session, category, description):
+        if not (enactor := self.get_enactor(session)):
+            raise ValueError("Permission denied.")
+        category = self.find_category(enactor, category)
+        return category.describe(session, description)
+
+    def describe_channel(self, session, category, name, description):
+        if not (enactor := self.get_enactor(session)):
+            raise ValueError("Permission denied.")
+        category = self.find_category(enactor, category)
+        return category.describe_channel(session, name, description)
 
     def channels(self):
         return AbstractChannel.objects.filter_family(channel_bridge__db_category__db_system__db_script=self).order_by('channel_bridge__db_category__db_name', 'db_key')
