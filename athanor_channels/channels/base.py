@@ -25,6 +25,7 @@ class HasChanOps(HasOps, HasRenderExamine):
     unban_msg = cmsg.Unban
     lock_msg = cmsg.Lock
     config_msg = cmsg.Config
+    desc_msg = cmsg.Describe
 
     def render_examine(self, viewer, callback=True):
         return self.render_examine_callback(None, viewer, callback=callback)
@@ -44,9 +45,12 @@ class HasChanOps(HasOps, HasRenderExamine):
     def describe(self, session, new_description):
         if not (enactor := self.get_enactor(session)) or not self.is_position(enactor, 'operator'):
             raise ValueError("Permission denied.")
+        old_desc = str(self.db.desc) if self.db.desc else '<BLANK>'
         if not new_description:
             raise ValueError("Nothing entered to set!")
         self.db.desc = new_description
+        entities = {'enactor': enactor, 'target': self}
+        self.desc_msg(entities, old_desc=old_desc, new_desc=new_description)
 
 
 class AbstractChannel(HasChanOps, DefaultChannel):

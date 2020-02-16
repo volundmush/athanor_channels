@@ -76,3 +76,7 @@ class Unban(ChannelMessage):
         'target': "|w{enactor_name}|n lifted {user_name} ban from this {target_typename}",
         'admin': "|w{enactor_name}|n lifted {user_name}'s ban from: {target_fullname}",
     }
+
+
+class Describe(ChannelMessage):
+    pass
